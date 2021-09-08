@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import date
+from typing import List
 from uuid import UUID
 import os
 import shutil
@@ -21,7 +22,7 @@ class Item(object):
     def __init__(self, path: Path):
         self.__path = path
         assert (self.__path.is_dir())
-        assert ((self.__path / CONFIG_FILENAME).exists())
+        #assert ((self.__path / CONFIG_FILENAME).exists())
 
     def __get_config(self) -> dict:
         config_path = self.path / CONFIG_FILENAME
@@ -52,7 +53,7 @@ class Item(object):
         return self.__get_config()["author"]
 
     @property
-    def documents(self) -> list[Document]:
+    def documents(self) -> List[Document]:
         return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != CONFIG_FILENAME]
 
     def add_document(self, original_path: Path) -> Document:
@@ -68,7 +69,7 @@ class Item(object):
 
 class Subject(object):
     @property
-    def items(self) -> list[Item]:
+    def items(self) -> List[Item]:
         pass
 
     def add_item(self, item: Item):
@@ -80,7 +81,7 @@ class Subject(object):
 
 class Archive(object):
     @property
-    def items(self) -> list[Item]:
+    def items(self) -> List[Item]:
         pass
 
     def add_item(self) -> Item:
@@ -90,7 +91,7 @@ class Archive(object):
         pass
 
     @property
-    def subjects(self) -> list[Item]:
+    def subjects(self) -> List[Item]:
         pass
 
     def add_subject(self) -> Subject:
