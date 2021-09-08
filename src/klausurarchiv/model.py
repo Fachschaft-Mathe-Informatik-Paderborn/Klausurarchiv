@@ -37,14 +37,14 @@ class Item(object):
         return self.__path / META_FILENAME
 
     @property
-    def __meta(self) -> ItemMeta:
+    def meta(self) -> ItemMeta:
         meta = ItemMeta()
         with open(self.__meta_path, mode="r") as file:
             meta.__dict__ = json.load(file)
         return meta
 
-    @__meta.setter
-    def __meta(self, new_meta: ItemMeta):
+    @meta.setter
+    def meta(self, new_meta: ItemMeta):
         with open(self.__meta_path, mode="w") as file:
             json.dump(new_meta.__dict__, file)
 
@@ -56,7 +56,7 @@ class Item(object):
         os.mkdir(item_path)
 
         item = Item(item_path)
-        item.__meta = ItemMeta()
+        item.meta = ItemMeta()
         return item
 
     @property
@@ -77,36 +77,6 @@ class Item(object):
         new_path.name = Path(f"{self.uuid} {new_name}")
         shutil.move(self.__path, new_path)
         self.__path = new_path
-
-    @property
-    def downloadable(self) -> bool:
-        return self.__meta.downloadable
-
-    @downloadable.setter
-    def downloadable(self, new_value: bool):
-        meta = self.__meta
-        meta.downloadable = new_value
-        self.__meta = meta
-
-    @property
-    def date(self) -> Optional[datetime.date]:
-        return self.__meta.date
-
-    @date.setter
-    def date(self, new_date: Optional[datetime.date]):
-        meta = self.__meta
-        meta.date = new_date
-        self.__meta = meta
-
-    @property
-    def author(self) -> Optional[str]:
-        return self.__meta.author
-
-    @author.setter
-    def author(self, new_author: str):
-        meta = self.__meta
-        meta.author = new_author
-        self.__meta = meta
 
     @property
     def documents(self) -> list[Document]:
