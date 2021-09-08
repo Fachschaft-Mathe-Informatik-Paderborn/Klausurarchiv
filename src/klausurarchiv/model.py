@@ -1,12 +1,12 @@
-from pathlib import Path
-from datetime import date
-from typing import List
-from uuid import UUID
+import datetime
+import json
 import os
 import shutil
-import json
+from pathlib import Path
+from typing import Optional, List
+from uuid import UUID, uuid4
 
-CONFIG_FILENAME = Path(".config")
+META_FILENAME = Path("meta.json")
 
 
 class Document(object):
@@ -17,46 +17,93 @@ class Document(object):
     def path(self) -> Path:
         return self.__path
 
+    def __str__(self) -> str:
+        return str(self.path.parent / self.path.name)
+
+
+class ItemMeta(object):
+    def __init__(self):
+        self.downloadable: bool = False
+        self.date: Optional[datetime.date] = None
+        self.author: Optional[str] = None
+
+    def store(self, file):
+        data = dict()
+        data["downloadable"] = self.downloadable
+        if self.date is None:
+            data["date"] = None
+        else:
+            data["date"] = self.date.isoformat()
+        data["author"] = self.author
+        json.dump(data, file)
+
+    def load(self, file):
+        data = json.load(file)
+        self.downloadable = data["downloadable"]
+        if data["date"] is None:
+            self.date = None
+        else:
+            self.date = datetime.date.fromisoformat(data["date"])
+        self.author = data["author"]
+
 
 class Item(object):
     def __init__(self, path: Path):
         self.__path = path
-        assert (self.__path.is_dir())
-        #assert ((self.__path / CONFIG_FILENAME).exists())
-
-    def __get_config(self) -> dict:
-        config_path = self.path / CONFIG_FILENAME
-        return json.load(open(config_path, mode="r"))
 
     @property
-    def uuid(self) -> UUID:
-        return UUID(self.path.name.partition(" ")[0])
+    def meta_path(self):
+        return self.__path / META_FILENAME
 
     @property
-    def downloadable(self) -> bool:
-        return self.__get_config()["downloadable"]
+    def meta(self) -> ItemMeta:
+        meta = ItemMeta()
+        with open(self.meta_path, mode="r") as file:
+            meta.load(file)
+        return meta
+
+    @meta.setter
+    def meta(self, new_meta: ItemMeta):
+        with open(self.meta_path, mode="w") as file:
+            new_meta.store(file)
+
+    @staticmethod
+    def new_item(base_dir: Path) -> 'Item':
+        uuid = uuid4()
+        name = "unnamed"
+        item_path = base_dir / Path(f"{uuid} {name}")
+        os.mkdir(item_path)
+
+        item = Item(item_path)
+        item.meta = ItemMeta()
+        return item
 
     @property
     def path(self) -> Path:
         return self.__path
 
     @property
+    def uuid(self) -> UUID:
+        return UUID(self.path.name.partition(" ")[0])
+
+    @property
     def name(self) -> str:
         return self.path.name.partition(" ")[2]
 
-    @property
-    def date(self) -> date:
-        return date.fromisoformat(self.__get_config()["date"])
-
-    @property
-    def author(self) -> str:
-        return self.__get_config()["author"]
+    @name.setter
+    def name(self, new_name: str):
+        new_path = Path(self.path)
+        new_path.name = Path(f"{self.uuid} {new_name}")
+        shutil.move(self.__path, new_path)
+        self.__path = new_path
 
     @property
     def documents(self) -> List[Document]:
-        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != CONFIG_FILENAME]
+        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != META_FILENAME]
 
     def add_document(self, original_path: Path) -> Document:
+        if original_path.name == META_FILENAME:
+            raise KeyError(f"Documents may not have the name {META_FILENAME}")
         target_path = self.path / original_path.name
         shutil.copy(original_path, target_path)
         return Document(target_path)
@@ -64,38 +111,31 @@ class Item(object):
     def remove_document(self, document: Document):
         if document.path.parent != self.path:
             raise KeyError(f"Document {document} is not part of item {self}")
+        if document.path.name == META_FILENAME:
+            raise KeyError(f"{META_FILENAME} is not a document")
         os.remove(document.path)
 
-
-class Subject(object):
-    @property
-    def items(self) -> List[Item]:
-        pass
-
-    def add_item(self, item: Item):
-        pass
-
-    def remove_item(self, item: Item):
-        pass
+    def __str__(self) -> str:
+        return str(self.path.name)
 
 
 class Archive(object):
+    def __init__(self, path: Path):
+        self.__path = path
+
+    @property
+    def path(self) -> Path:
+        return self.__path
+
     @property
     def items(self) -> List[Item]:
-        pass
+        return [Item(item_path) for item_path in self.path.iterdir() if item_path.is_dir()]
 
     def add_item(self) -> Item:
-        pass
+        item = Item.new_item(self.path)
+        return item
 
     def remove_item(self, item: Item):
-        pass
-
-    @property
-    def subjects(self) -> List[Item]:
-        pass
-
-    def add_subject(self) -> Subject:
-        pass
-
-    def remove_subject(self, subject: Subject):
-        pass
+        if item.path.parent != self.path:
+            raise KeyError(f"Item {item} is not part of the archive")
+        shutil.rmtree(item.path)
