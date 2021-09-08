@@ -57,6 +57,10 @@ class Item(object):
         item_path = base_dir / Path(f"{uuid} {name}")
         os.mkdir(item_path)
 
+        item = Item(item_path)
+        item.__meta = ItemMeta()
+        return item
+
     @property
     def path(self) -> Path:
         return self.__path
@@ -128,7 +132,7 @@ class Item(object):
         return str(self.path.name)
 
 
-class Subject(object):
+class Archive(object):
     def __init__(self, path: Path):
         self.__path = path
 
@@ -140,30 +144,11 @@ class Subject(object):
     def items(self) -> list[Item]:
         return [Item(item_path) for item_path in self.path.iterdir() if item_path.is_dir()]
 
-    def add_item(self, item: Item):
-        pass
-
-    def remove_item(self, item: Item):
-        pass
-
-
-class Archive(object):
-    @property
-    def items(self) -> list[Item]:
-        pass
-
     def add_item(self) -> Item:
-        pass
+        item = Item.new_item(self.path)
+        return item
 
     def remove_item(self, item: Item):
-        pass
-
-    @property
-    def subjects(self) -> list[Item]:
-        pass
-
-    def add_subject(self) -> Subject:
-        pass
-
-    def remove_subject(self, subject: Subject):
-        pass
+        if item.path.parent != self.path:
+            raise KeyError(f"Item {item} is not part of the archive")
+        shutil.rmtree(item.path)
