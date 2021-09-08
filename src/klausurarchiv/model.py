@@ -1,6 +1,8 @@
 from pathlib import Path
 from datetime import date
 
+from typing import List
+
 
 class Commitable(object):
     def commit(self):
@@ -41,21 +43,21 @@ class Item(Commitable):
         pass
 
     @property
-    def documents(self) -> list[Document]:
+    def documents(self) -> List[Document]:
         return self.__documents
 
 
 class Subject(Commitable):
     @property
-    def items(self) -> list[Item]:
+    def items(self) -> List[Item]:
         pass
 
 
 class Archive(Commitable):
     @property
-    def items(self) -> list[Item]:
+    def items(self) -> List[Item]:
         pass
 
     @property
-    def subjects(self) -> list[Item]:
+    def subjects(self) -> List[Item]:
         pass
