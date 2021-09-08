@@ -31,8 +31,6 @@ class ItemMeta(object):
 class Item(object):
     def __init__(self, path: Path):
         self.__path = path
-        assert (self.__path.is_dir())
-        assert (self.__meta_path.exists())
 
     @property
     def __meta_path(self):
