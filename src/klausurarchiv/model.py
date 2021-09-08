@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID, uuid4
 
 META_FILENAME = Path("meta.json")
@@ -98,7 +98,7 @@ class Item(object):
         self.__path = new_path
 
     @property
-    def documents(self) -> list[Document]:
+    def documents(self) -> List[Document]:
         return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != META_FILENAME]
 
     def add_document(self, original_path: Path) -> Document:
@@ -128,7 +128,7 @@ class Archive(object):
         return self.__path
 
     @property
-    def items(self) -> list[Item]:
+    def items(self) -> List[Item]:
         return [Item(item_path) for item_path in self.path.iterdir() if item_path.is_dir()]
 
     def add_item(self) -> Item:
