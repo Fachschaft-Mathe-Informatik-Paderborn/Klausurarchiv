@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import date
 
+
 class Commitable(object):
     def commit(self):
         raise NotImplementedError
@@ -8,10 +9,12 @@ class Commitable(object):
     def reset(self):
         raise NotImplementedError
 
+
 class Document(Commitable):
     @property
     def path(self) -> Path:
         pass
+
 
 class Item(Commitable):
     def __init__(self):
@@ -41,10 +44,12 @@ class Item(Commitable):
     def documents(self) -> list[Document]:
         return self.__documents
 
+
 class Subject(Commitable):
     @property
     def items(self) -> list[Item]:
         pass
+
 
 class Archive(Commitable):
     @property
