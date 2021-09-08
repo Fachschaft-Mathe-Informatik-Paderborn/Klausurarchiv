@@ -27,26 +27,45 @@ class ItemMeta(object):
         self.date: Optional[datetime.date] = None
         self.author: Optional[str] = None
 
+    def store(self, file):
+        data = dict()
+        data["downloadable"] = self.downloadable
+        if self.date is None:
+            data["date"] = None
+        else:
+            data["date"] = self.date.isoformat()
+        data["author"] = self.author
+        json.dump(data, file)
+
+    def load(self, file):
+        data = json.load(file)
+        self.downloadable = data["downloadable"]
+        if data["date"] is None:
+            self.date = None
+        else:
+            self.date = datetime.date.fromisoformat(data["date"])
+        self.author = data["author"]
+
 
 class Item(object):
     def __init__(self, path: Path):
         self.__path = path
 
     @property
-    def __meta_path(self):
+    def meta_path(self):
         return self.__path / META_FILENAME
 
     @property
     def meta(self) -> ItemMeta:
         meta = ItemMeta()
-        with open(self.__meta_path, mode="r") as file:
-            meta.__dict__ = json.load(file)
+        with open(self.meta_path, mode="r") as file:
+            meta.load(file)
         return meta
 
     @meta.setter
     def meta(self, new_meta: ItemMeta):
-        with open(self.__meta_path, mode="w") as file:
-            json.dump(new_meta.__dict__, file)
+        with open(self.meta_path, mode="w") as file:
+            new_meta.store(file)
 
     @staticmethod
     def new_item(base_dir: Path) -> 'Item':
