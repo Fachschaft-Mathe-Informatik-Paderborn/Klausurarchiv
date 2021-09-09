@@ -92,14 +92,13 @@ class Item(object):
 
     @name.setter
     def name(self, new_name: str):
-        new_path = Path(self.path)
-        new_path.name = Path(f"{self.uuid} {new_name}")
+        new_path = self.path.parent / Path(f"{self.uuid} {new_name}")
         shutil.move(self.__path, new_path)
         self.__path = new_path
 
     @property
     def documents(self) -> List[Document]:
-        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != META_FILENAME]
+        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != str(META_FILENAME)]
 
     def add_document(self, original_path: Path) -> Document:
         if original_path.name == META_FILENAME:

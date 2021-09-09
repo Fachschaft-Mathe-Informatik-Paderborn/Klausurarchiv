@@ -59,3 +59,64 @@ class TestItem(object):
             files = list(directory.iterdir())
             assert len(files) == 1
             assert str(files[0].name) == str(META_FILENAME)
+
+    def test_path(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            item = Item.new_item(tempdir)
+            item_path = list(Path(tempdir).iterdir())[0]
+            assert item.path == item_path
+
+    def test_uuid_name(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            item = Item.new_item(tempdir)
+            item_path = list(Path(tempdir).iterdir())[0]
+            (uuid, _, name) = str(item_path.name).partition(" ")
+            assert item.uuid == UUID(uuid)
+            assert item.name == name
+
+            item.name = "New Name"
+            assert item.name == "New Name"
+            item_path = list(Path(tempdir).iterdir())[0]
+            name = str(item_path).partition(" ")[2]
+            assert name == "New Name"
+
+    def test_documents(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            item = Item.new_item(tempdir)
+            assert len(item.documents) == 0
+
+            path_a = Path(tempdir) / "a.txt"
+            with open(path_a, mode="w") as fileA:
+                fileA.write("Hello World\n")
+            path_b = Path(tempdir) / "b.txt"
+            with open(path_b, mode="w") as fileB:
+                fileB.write("Foo Bar\n")
+
+            doc_a = item.add_document(path_a)
+            assert doc_a.path.is_file()
+            assert doc_a.path.parent == item.path
+            assert str(doc_a.path.name) == "a.txt"
+            with open(doc_a.path, mode="r") as fileA:
+                assert fileA.readline() == "Hello World\n"
+
+            assert len(item.documents) == 1
+            assert item.documents[0].path == doc_a.path
+
+            doc_b = item.add_document(path_b)
+            assert doc_b.path.is_file()
+            assert doc_b.path.parent == item.path
+            assert str(doc_b.path.name) == "b.txt"
+            with open(doc_b.path, mode="r") as fileB:
+                assert fileB.readline() == "Foo Bar\n"
+
+            assert len(item.documents) == 2
+            assert item.documents[0].path in [doc_a.path, doc_b.path]
+            assert item.documents[1].path in [doc_a.path, doc_b.path]
+            assert item.documents[0].path != item.documents[1].path
+
+            item.remove_document(doc_a)
+            assert len(item.documents) == 1
+            assert item.documents[0].path == doc_b.path
+
+            item.remove_document(doc_b)
+            assert len(item.documents) == 0
