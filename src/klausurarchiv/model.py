@@ -17,6 +17,11 @@ class Document(object):
     def path(self) -> Path:
         return self.__path
 
+    def rename(self, new_name: str):
+        new_path = self.path.parent / Path(new_name)
+        shutil.move(self.path, new_path)
+        self.__path = new_path
+
     def __str__(self) -> str:
         return str(self.path.parent / self.path.name)
 

@@ -10,6 +10,23 @@ class TestDocument(object):
             doc = Document(path)
             assert (doc.path == path)
 
+    def test_rename(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            old_path = Path(tempdir) / Path("a.txt")
+            new_path = Path(tempdir) / Path("b.txt")
+
+            with open(old_path, mode="w") as file:
+                file.write("Hallo Welt\n")
+            document = Document(old_path)
+            document.rename(new_path.name)
+
+            assert not old_path.exists()
+            assert new_path.is_file()
+            assert document.path == new_path
+
+            with open(new_path, mode="r") as file:
+                assert file.readline() == "Hallo Welt\n"
+
 
 class TestItemMeta(object):
     def test_load_store(self):
