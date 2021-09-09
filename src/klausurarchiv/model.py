@@ -11,7 +11,7 @@ META_FILENAME = Path("meta.json")
 
 class Document(object):
     def __init__(self, path: Path):
-        self.__path = path
+        self.__path: Path = Path(path)
 
     @property
     def path(self) -> Path:
@@ -19,6 +19,15 @@ class Document(object):
 
     def __str__(self) -> str:
         return str(self.path.parent / self.path.name)
+
+    def __eq__(self, other) -> bool:
+        return self.path == other.path
+
+    def __ne__(self, other) -> bool:
+        return self.path != other.path
+
+    def __hash__(self) -> int:
+        return hash(self.__path)
 
 
 class ItemMeta(object):
@@ -49,7 +58,7 @@ class ItemMeta(object):
 
 class Item(object):
     def __init__(self, path: Path):
-        self.__path = path
+        self.__path: Path = Path(path)
 
     @property
     def meta_path(self):
@@ -92,14 +101,13 @@ class Item(object):
 
     @name.setter
     def name(self, new_name: str):
-        new_path = Path(self.path)
-        new_path.name = Path(f"{self.uuid} {new_name}")
+        new_path = self.path.parent / Path(f"{self.uuid} {new_name}")
         shutil.move(self.__path, new_path)
         self.__path = new_path
 
     @property
     def documents(self) -> List[Document]:
-        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != META_FILENAME]
+        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != str(META_FILENAME)]
 
     def add_document(self, original_path: Path) -> Document:
         if original_path.name == META_FILENAME:
@@ -118,10 +126,19 @@ class Item(object):
     def __str__(self) -> str:
         return str(self.path.name)
 
+    def __eq__(self, other) -> bool:
+        return self.path == other.path
+
+    def __ne__(self, other) -> bool:
+        return self.path != other.path
+
+    def __hash__(self) -> int:
+        return hash(self.__path)
+
 
 class Archive(object):
     def __init__(self, path: Path):
-        self.__path = path
+        self.__path: Path = Path(path)
 
     @property
     def path(self) -> Path:
@@ -139,3 +156,12 @@ class Archive(object):
         if item.path.parent != self.path:
             raise KeyError(f"Item {item} is not part of the archive")
         shutil.rmtree(item.path)
+
+    def __eq__(self, other) -> bool:
+        return self.path == other.path
+
+    def __ne__(self, other) -> bool:
+        return self.path != other.path
+
+    def __hash__(self) -> int:
+        return hash(self.__path)
