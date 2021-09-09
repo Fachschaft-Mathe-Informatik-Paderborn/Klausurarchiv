@@ -99,8 +99,7 @@ class TestItem(object):
             with open(doc_a.path, mode="r") as fileA:
                 assert fileA.readline() == "Hello World\n"
 
-            assert len(item.documents) == 1
-            assert item.documents[0].path == doc_a.path
+            assert item.documents == [doc_a]
 
             doc_b = item.add_document(path_b)
             assert doc_b.path.is_file()
@@ -109,14 +108,41 @@ class TestItem(object):
             with open(doc_b.path, mode="r") as fileB:
                 assert fileB.readline() == "Foo Bar\n"
 
-            assert len(item.documents) == 2
-            assert item.documents[0].path in [doc_a.path, doc_b.path]
-            assert item.documents[1].path in [doc_a.path, doc_b.path]
-            assert item.documents[0].path != item.documents[1].path
+            assert set(item.documents) == {doc_a, doc_b}
 
             item.remove_document(doc_a)
-            assert len(item.documents) == 1
-            assert item.documents[0].path == doc_b.path
+            assert not doc_a.path.exists()
+            assert doc_b.path.is_file()
+            assert item.documents == [doc_b]
 
             item.remove_document(doc_b)
-            assert len(item.documents) == 0
+            assert not doc_b.path.exists()
+            assert item.documents == []
+
+
+class TestArchive(object):
+    def test_items(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            assert str(archive.path) == tempdir
+            assert len(archive.items) == 0
+
+            item_a = archive.add_item()
+            assert item_a.path.is_dir()
+            assert item_a.path.parent == archive.path
+            assert archive.items == [item_a]
+
+            item_b = archive.add_item()
+            assert item_b.path.is_dir()
+            assert item_b.path.parent == archive.path
+            assert item_a != item_b
+            assert set(archive.items) == {item_a, item_b}
+
+            archive.remove_item(item_a)
+            assert not item_a.path.exists()
+            assert item_b.path.is_dir()
+            assert archive.items == [item_b]
+
+            archive.remove_item(item_b)
+            assert not item_b.path.exists()
+            assert archive.items == []
