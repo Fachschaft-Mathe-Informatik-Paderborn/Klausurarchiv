@@ -83,19 +83,12 @@ class TestItem(object):
             item_path = list(Path(tempdir).iterdir())[0]
             assert item.path == item_path
 
-    def test_uuid_name(self):
+    def test_uuid(self):
         with tempfile.TemporaryDirectory() as tempdir:
             item = Item.new_item(tempdir)
             item_path = list(Path(tempdir).iterdir())[0]
-            (uuid, _, name) = str(item_path.name).partition(" ")
-            assert item.uuid == UUID(uuid)
-            assert item.name == name
-
-            item.name = "New Name"
-            assert item.name == "New Name"
-            item_path = list(Path(tempdir).iterdir())[0]
-            name = str(item_path).partition(" ")[2]
-            assert name == "New Name"
+            uuid = UUID(str(item_path.name))
+            assert item.uuid == uuid
 
     def test_documents(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -146,12 +139,12 @@ class TestArchive(object):
 
             item_a = archive.add_item()
             assert item_a.path.is_dir()
-            assert item_a.path.parent == archive.path
+            assert item_a.path.parent == archive.items_dir
             assert archive.items == [item_a]
 
             item_b = archive.add_item()
             assert item_b.path.is_dir()
-            assert item_b.path.parent == archive.path
+            assert item_b.path.parent == archive.items_dir
             assert item_a != item_b
             assert set(archive.items) == {item_a, item_b}
 

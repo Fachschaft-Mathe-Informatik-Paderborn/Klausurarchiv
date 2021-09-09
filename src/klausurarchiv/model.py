@@ -38,27 +38,21 @@ class Document(object):
 class ItemMeta(object):
     def __init__(self):
         self.downloadable: bool = False
+        self.name = "unnamed"
         self.date: Optional[datetime.date] = None
         self.author: Optional[str] = None
 
     def store(self, file):
-        data = dict()
-        data["downloadable"] = self.downloadable
-        if self.date is None:
-            data["date"] = None
-        else:
+        data = self.__dict__
+        if data["date"] is not None:
             data["date"] = self.date.isoformat()
-        data["author"] = self.author
         json.dump(data, file)
 
     def load(self, file):
         data = json.load(file)
-        self.downloadable = data["downloadable"]
-        if data["date"] is None:
-            self.date = None
-        else:
-            self.date = datetime.date.fromisoformat(data["date"])
-        self.author = data["author"]
+        if data["date"] is not None:
+            data["date"] = datetime.date.fromisoformat(data["date"])
+        self.__dict__ = data
 
 
 class Item(object):
@@ -84,8 +78,7 @@ class Item(object):
     @staticmethod
     def new_item(base_dir: Path) -> 'Item':
         uuid = uuid4()
-        name = "unnamed"
-        item_path = base_dir / Path(f"{uuid} {name}")
+        item_path = base_dir / Path(str(uuid))
         os.mkdir(item_path)
 
         item = Item(item_path)
@@ -98,17 +91,7 @@ class Item(object):
 
     @property
     def uuid(self) -> UUID:
-        return UUID(self.path.name.partition(" ")[0])
-
-    @property
-    def name(self) -> str:
-        return self.path.name.partition(" ")[2]
-
-    @name.setter
-    def name(self, new_name: str):
-        new_path = self.path.parent / Path(f"{self.uuid} {new_name}")
-        shutil.move(self.__path, new_path)
-        self.__path = new_path
+        return UUID(self.path.name)
 
     @property
     def documents(self) -> List[Document]:
@@ -144,6 +127,12 @@ class Item(object):
 class Archive(object):
     def __init__(self, path: Path):
         self.__path: Path = Path(path)
+        if not self.items_dir.exists():
+            os.mkdir(self.items_dir)
+
+    @property
+    def items_dir(self) -> Path:
+        return self.path / Path("items")
 
     @property
     def path(self) -> Path:
@@ -151,14 +140,14 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        return [Item(item_path) for item_path in self.path.iterdir() if item_path.is_dir()]
+        return [Item(item_path) for item_path in self.items_dir.iterdir() if item_path.is_dir()]
 
     def add_item(self) -> Item:
-        item = Item.new_item(self.path)
+        item = Item.new_item(self.items_dir)
         return item
 
     def remove_item(self, item: Item):
-        if item.path.parent != self.path:
+        if item.path.parent != self.items_dir:
             raise KeyError(f"Item {item} is not part of the archive")
         shutil.rmtree(item.path)
 
