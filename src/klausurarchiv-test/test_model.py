@@ -93,6 +93,23 @@ class TestItem(object):
             item.remove_document(doc_b)
             assert item.documents == []
 
+    def test_courses(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            course1 = archive.add_course("Rocket Science")
+            course2 = archive.add_course("Foundations of Rocket Science")
+
+            item = archive.add_item()
+            assert item.applicable_courses == []
+            item.add_to_course(course1)
+            assert item.applicable_courses == [course1]
+            item.add_to_course(course2)
+            assert set(item.applicable_courses) == {course1, course2}
+            item.remove_from_course(course1)
+            assert item.applicable_courses == [course2]
+            item.remove_from_course(course2)
+            assert item.applicable_courses == []
+
 
 class TestArchive(object):
     def test_items(self):
@@ -122,3 +139,18 @@ class TestArchive(object):
 
             archive_b = Archive(tempdir)
             assert len(archive_b.items) == 1
+
+    def test_courses(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+
+            assert archive.courses == []
+            course1 = archive.add_course("Rocket Science")
+            assert archive.courses == [course1]
+            course2 = archive.add_course("Foundations of Rocket Science")
+            assert set(archive.courses) == {course1, course2}
+            archive.remove_course(course1)
+            assert archive.courses == [course2]
+            archive.remove_course(course2)
+            assert archive.courses == []
+

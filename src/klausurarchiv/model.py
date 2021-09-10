@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS "Courses" (
 );
 CREATE TABLE IF NOT EXISTS "ItemCourseMap" (
     "ItemID"	INTEGER NOT NULL,
-    "SubjectID"	INTEGER NOT NULL,
-    PRIMARY KEY("ItemID","SubjectID"),
-    FOREIGN KEY("SubjectID") REFERENCES "Courses"("ID"),
+    "CourseID"	INTEGER NOT NULL,
+    PRIMARY KEY("ItemID","CourseID"),
+    FOREIGN KEY("CourseID") REFERENCES "Courses"("ID"),
     FOREIGN KEY("ItemID") REFERENCES "Items"("ID")
 );
 COMMIT;
@@ -112,7 +112,8 @@ class Course(object):
     @property
     def aliases(self) -> List[str]:
         cursor = self.__db.cursor()
-        names = [row[0] for row in cursor.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
+        names = [row[0] for row in
+                 cursor.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
         cursor.close()
         return names
 
@@ -220,19 +221,19 @@ class Item(object):
     @property
     def applicable_courses(self) -> List[Course]:
         cursor = self.__db.cursor()
-        courses = [Course(row[0]) for row in
-                   cursor.execute("select CourseID from CourseItemMap where ItemID=?", (self.item_id,))]
+        courses = [Course(row[0], self.__db) for row in
+                   cursor.execute("select CourseID from ItemCourseMap where ItemID=?", (self.item_id,))]
         cursor.close()
         return courses
 
     def add_to_course(self, course: Course):
         cursor = self.__db.cursor()
-        cursor.execute("insert into CourseItemMap(ItemID, CourseID) values (?, ?)", (self.item_id, course.course_id))
+        cursor.execute("insert into ItemCourseMap(ItemID, CourseID) values (?, ?)", (self.item_id, course.course_id))
         cursor.close()
 
     def remove_from_course(self, course: Course):
         cursor = self.__db.cursor()
-        cursor.execute("delete from CourseItemMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
+        cursor.execute("delete from ItemCourseMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
         cursor.close()
 
     def __eq__(self, other: 'Item') -> bool:
