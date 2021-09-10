@@ -1,138 +1,188 @@
 import datetime
-import json
 import os
 import shutil
+import sqlite3
 from pathlib import Path
-from typing import Optional, List
-from uuid import UUID, uuid4
+from typing import List
+from uuid import uuid4
 
-META_FILENAME = Path("meta.json")
+SCHEMA_SQL = """
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "Items" (
+    "ID"	        INTEGER NOT NULL,
+    "downloadable"  INTEGER DEFAULT false,
+    "name"	        TEXT,
+    "date"	        TEXT,
+    PRIMARY KEY("ID" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "Documents" (
+    "ID"	INTEGER NOT NULL,
+    "name"	TEXT,
+    "path"	TEXT,
+    "item"	INTEGER,
+    PRIMARY KEY("ID" AUTOINCREMENT),
+    FOREIGN KEY("item") REFERENCES "Items"("ID")
+);
+CREATE TABLE IF NOT EXISTS "SubjectNames" (
+    "ID"	INTEGER NOT NULL,
+    "name"	TEXT NOT NULL,
+    FOREIGN KEY("ID") REFERENCES "Subjects"("ID")
+);
+CREATE TABLE IF NOT EXISTS "Subjects" (
+    "ID"	INTEGER NOT NULL,
+    PRIMARY KEY("ID" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "ItemSubjectMap" (
+    "ItemID"	INTEGER NOT NULL,
+    "SubjectID"	INTEGER NOT NULL,
+    FOREIGN KEY("ItemID") REFERENCES "Items"("ID"),
+    FOREIGN KEY("SubjectID") REFERENCES "Subjects"("ID")
+);
+COMMIT;
+"""
 
 
 class Document(object):
-    def __init__(self, path: Path):
-        self.__path: Path = Path(path)
+    def __init__(self, db: sqlite3.Connection, doc_id: int):
+        self.__db = db
+        self.__doc_id = doc_id
+
+    @property
+    def doc_id(self) -> int:
+        return self.__doc_id
+
+    @property
+    def name(self) -> str:
+        cursor = self.__db.cursor()
+        cursor.execute("select name from Documents where ID=?", (self.__doc_id,))
+        name = cursor.fetchone()[0]
+        cursor.close()
+        return name
+
+    @name.setter
+    def name(self, new_name: str):
+        cursor = self.__db.cursor()
+        cursor.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
+        cursor.close()
 
     @property
     def path(self) -> Path:
-        return self.__path
+        cursor = self.__db.cursor()
+        cursor.execute("select path from Documents where ID=?", (self.__doc_id,))
+        path = Path(cursor.fetchone()[0])
+        cursor.close()
+        return path
 
-    def rename(self, new_name: str):
-        new_path = self.path.parent / Path(new_name)
-        shutil.move(self.path, new_path)
-        self.__path = new_path
+    def __eq__(self, other: 'Document') -> bool:
+        return self.__db == other.__db and self.doc_id == other.doc_id
 
-    def __str__(self) -> str:
-        return str(self.path.parent / self.path.name)
-
-    def __eq__(self, other) -> bool:
-        return self.path == other.path
-
-    def __ne__(self, other) -> bool:
-        return self.path != other.path
+    def __ne__(self, other: 'Document') -> bool:
+        return not self == other
 
     def __hash__(self) -> int:
-        return hash(self.__path)
+        return hash((self.__db, self.doc_id))
 
 
 class ItemMeta(object):
-    def __init__(self):
-        self.downloadable: bool = False
-        self.name = "unnamed"
-        self.date: Optional[datetime.date] = None
-        self.author: Optional[str] = None
+    def __init__(self, db: sqlite3.Connection, item_id: int):
+        self.downloadable = False
+        self.name = None
+        self.date = None
 
-    def store(self, file):
-        data = self.__dict__
-        if data["date"] is not None:
-            data["date"] = self.date.isoformat()
-        json.dump(data, file)
+        cursor = db.cursor()
+        cursor.execute("select downloadable, name, date from Items where ID=?", (item_id,))
+        (downloadable, name, date) = cursor.fetchone()
+        self.downloadable = downloadable == 1
+        self.name = name
+        if date is None:
+            self.date = None
+        else:
+            self.date = datetime.date.fromisoformat(date)
+        cursor.close()
 
-    def load(self, file):
-        data = json.load(file)
-        if data["date"] is not None:
-            data["date"] = datetime.date.fromisoformat(data["date"])
-        self.__dict__ = data
+    def store(self, db: sqlite3.Connection, item_id: int):
+        cursor = db.cursor()
+        if self.downloadable:
+            downloadable = 1
+        else:
+            downloadable = 0
+        name = self.name
+        date = self.date.isoformat()
+        cursor.execute("update Items set downloadable=?, name=?, date=? where ID=?",
+                       (downloadable, name, date, item_id))
+        cursor.close()
 
 
 class Item(object):
-    def __init__(self, path: Path):
-        self.__path: Path = Path(path)
-
-    @property
-    def meta_path(self):
-        return self.__path / META_FILENAME
+    def __init__(self, item_id: int, db: sqlite3.Connection, docs_dir: Path):
+        self.__item_id = item_id
+        self.__db = db
+        self.__docs_dir = docs_dir
 
     @property
     def meta(self) -> ItemMeta:
-        meta = ItemMeta()
-        with open(self.meta_path, mode="r") as file:
-            meta.load(file)
-        return meta
+        return ItemMeta(self.__db, self.__item_id)
 
     @meta.setter
     def meta(self, new_meta: ItemMeta):
-        with open(self.meta_path, mode="w") as file:
-            new_meta.store(file)
-
-    @staticmethod
-    def new_item(base_dir: Path) -> 'Item':
-        uuid = uuid4()
-        item_path = base_dir / Path(str(uuid))
-        os.mkdir(item_path)
-
-        item = Item(item_path)
-        item.meta = ItemMeta()
-        return item
+        new_meta.store(self.__db, self.__item_id)
 
     @property
-    def path(self) -> Path:
-        return self.__path
-
-    @property
-    def uuid(self) -> UUID:
-        return UUID(self.path.name)
+    def item_id(self):
+        return self.__item_id
 
     @property
     def documents(self) -> List[Document]:
-        return [Document(doc_path) for doc_path in self.path.iterdir() if doc_path.name != str(META_FILENAME)]
+        cursor = self.__db.cursor()
+        docs = [Document(self.__db, int(row[0])) for row in
+                cursor.execute("select ID from Documents where item=?", (self.__item_id,))]
+        cursor.close()
+        return docs
 
     def add_document(self, original_path: Path) -> Document:
-        if original_path.name == META_FILENAME:
-            raise KeyError(f"Documents may not have the name {META_FILENAME}")
-        target_path = self.path / original_path.name
-        shutil.copy(original_path, target_path)
-        return Document(target_path)
+        target_path = self.__docs_dir / Path(f"{uuid4()}{original_path.suffix}")
+        shutil.move(original_path, target_path)
+
+        cursor = self.__db.cursor()
+        cursor.execute("insert into Documents(name, path, item) values (?, ?, ?)",
+                       (original_path.name, str(target_path), self.__item_id))
+        doc = Document(self.__db, cursor.lastrowid)
+        cursor.close()
+
+        return doc
 
     def remove_document(self, document: Document):
-        if document.path.parent != self.path:
-            raise KeyError(f"Document {document} is not part of item {self}")
-        if document.path.name == META_FILENAME:
-            raise KeyError(f"{META_FILENAME} is not a document")
-        os.remove(document.path)
+        cursor = self.__db.cursor()
+        cursor.execute("delete from Documents where ID=?", (document.doc_id,))
+        cursor.close()
 
-    def __str__(self) -> str:
-        return str(self.path.name)
+    def __eq__(self, other: 'Item') -> bool:
+        return self.__db == other.__db and self.item_id == other.item_id
 
-    def __eq__(self, other) -> bool:
-        return self.path == other.path
-
-    def __ne__(self, other) -> bool:
-        return self.path != other.path
+    def __ne__(self, other: 'Item') -> bool:
+        return not self == other
 
     def __hash__(self) -> int:
-        return hash(self.__path)
+        return hash((self.__db, self.item_id))
 
 
 class Archive(object):
     def __init__(self, path: Path):
         self.__path: Path = Path(path)
-        if not self.items_dir.exists():
-            os.mkdir(self.items_dir)
+        self.__db: sqlite3.Connection = sqlite3.connect(self.path / Path("archive.sqlite"))
+        cursor = self.__db.cursor()
+        cursor.executescript(SCHEMA_SQL)
+        cursor.close()
+
+        if not self.docs_dir.exists():
+            os.mkdir(self.docs_dir)
+
+    def __del__(self):
+        self.__db.commit()
 
     @property
-    def items_dir(self) -> Path:
-        return self.path / Path("items")
+    def docs_dir(self) -> Path:
+        return self.__path / Path("docs")
 
     @property
     def path(self) -> Path:
@@ -140,22 +190,25 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        return [Item(item_path) for item_path in self.items_dir.iterdir() if item_path.is_dir()]
+        cursor = self.__db.cursor()
+        items = [Item(item_id[0], self.__db, self.docs_dir) for item_id in cursor.execute("select ID from Items")]
+        cursor.close()
+        return items
 
     def add_item(self) -> Item:
-        item = Item.new_item(self.items_dir)
+        cursor = self.__db.cursor()
+        cursor.execute('insert into Items(name) values (NULL)')
+        item = Item(int(cursor.lastrowid), self.__db, self.docs_dir)
+        cursor.close()
         return item
 
     def remove_item(self, item: Item):
-        if item.path.parent != self.items_dir:
-            raise KeyError(f"Item {item} is not part of the archive")
-        shutil.rmtree(item.path)
+        cursor = self.__db.cursor()
+        cursor.execute("delete from Items where Id = ?", (item.item_id,))
+        cursor.close()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: 'Archive') -> bool:
         return self.path == other.path
 
-    def __ne__(self, other) -> bool:
-        return self.path != other.path
-
-    def __hash__(self) -> int:
-        return hash(self.__path)
+    def __new(self, other: 'Archive') -> bool:
+        return not self.path == other.path

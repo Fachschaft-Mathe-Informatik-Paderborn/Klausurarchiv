@@ -4,129 +4,66 @@ from klausurarchiv.model import *
 
 
 class TestDocument(object):
-    def test_path(self):
+    def test_document(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            path = Path(tempdir) / Path("test.txt")
-            doc = Document(path)
-            assert (doc.path == path)
+            archive = Archive(tempdir)
+            item = archive.add_item()
 
-    def test_rename(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            old_path = Path(tempdir) / Path("a.txt")
-            new_path = Path(tempdir) / Path("b.txt")
+            doc_a_path = Path(tempdir) / Path("doc_a.txt")
+            with open(doc_a_path, mode="w") as file:
+                file.write("Hello World\n")
+            doc_a = item.add_document(doc_a_path)
 
-            with open(old_path, mode="w") as file:
-                file.write("Hallo Welt\n")
-            document = Document(old_path)
-            document.rename(new_path.name)
-
-            assert not old_path.exists()
-            assert new_path.is_file()
-            assert document.path == new_path
-
-            with open(new_path, mode="r") as file:
-                assert file.readline() == "Hallo Welt\n"
-
-
-class TestItemMeta(object):
-    def test_load_store(self):
-        with tempfile.TemporaryFile(mode="w+") as file:
-            meta = ItemMeta()
-            meta.downloadable = True
-            meta.date = datetime.date(2021, 12, 9)
-            meta.author = None
-            meta.store(file)
-
-            new_meta = ItemMeta()
-            file.seek(0)
-            new_meta.load(file)
-            assert new_meta.downloadable
-            assert new_meta.date == datetime.date(2021, 12, 9)
-            assert meta.author is None
+            doc_a.name = "Hello World.txt"
+            assert doc_a.name == "Hello World.txt"
+            with open(doc_a.path, mode="r") as file:
+                assert file.readline() == "Hello World\n"
 
 
 class TestItem(object):
     def test_meta(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            item = Item.new_item(tempdir)
-            meta_path = item.meta_path
-            assert meta_path.is_file()
-            assert str(meta_path.name) == str(META_FILENAME)
-            assert meta_path.parent == item.path
+            archive = Archive(tempdir)
+            item = archive.add_item()
 
             meta = item.meta
             meta.date = datetime.date(2021, 9, 8)
             meta.downloadable = True
             item.meta = meta
 
-            with open(meta_path, mode="r") as meta_file:
-                meta = json.load(meta_file)
-
-            assert meta["date"] == "2021-09-08"
-            assert meta["downloadable"]
-
-    def test_new_item(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            Item.new_item(tempdir)
-            directory = Path(tempdir)
-            dirs = list(directory.iterdir())
-            assert len(dirs) == 1
-            directory = dirs[0]
-            assert directory.is_dir()
-            files = list(directory.iterdir())
-            assert len(files) == 1
-            assert str(files[0].name) == str(META_FILENAME)
-
-    def test_path(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            item = Item.new_item(tempdir)
-            item_path = list(Path(tempdir).iterdir())[0]
-            assert item.path == item_path
-
-    def test_uuid(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            item = Item.new_item(tempdir)
-            item_path = list(Path(tempdir).iterdir())[0]
-            uuid = UUID(str(item_path.name))
-            assert item.uuid == uuid
+            meta = item.meta
+            assert meta.date == datetime.date(2021, 9, 8)
+            assert meta.downloadable
 
     def test_documents(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            item = Item.new_item(tempdir)
-            assert len(item.documents) == 0
+            doc_a_path = Path(tempdir) / Path("doc_a.txt")
+            with open(doc_a_path, mode="w") as file:
+                file.write("Hello World\n")
+            doc_b_path = Path(tempdir) / Path("doc_b.txt")
+            with open(doc_b_path, mode="w") as file:
+                file.write("Foo Bar\n")
 
-            path_a = Path(tempdir) / "a.txt"
-            with open(path_a, mode="w") as fileA:
-                fileA.write("Hello World\n")
-            path_b = Path(tempdir) / "b.txt"
-            with open(path_b, mode="w") as fileB:
-                fileB.write("Foo Bar\n")
+            archive = Archive(tempdir)
+            item = archive.add_item()
+            assert item.documents == []
 
-            doc_a = item.add_document(path_a)
-            assert doc_a.path.is_file()
-            assert doc_a.path.parent == item.path
-            assert str(doc_a.path.name) == "a.txt"
-            with open(doc_a.path, mode="r") as fileA:
-                assert fileA.readline() == "Hello World\n"
-
+            doc_a = item.add_document(doc_a_path)
+            assert not doc_a_path.exists()
             assert item.documents == [doc_a]
+            with open(doc_a.path, mode="r") as file:
+                assert file.readline() == "Hello World\n"
 
-            doc_b = item.add_document(path_b)
-            assert doc_b.path.is_file()
-            assert doc_b.path.parent == item.path
-            assert str(doc_b.path.name) == "b.txt"
-            with open(doc_b.path, mode="r") as fileB:
-                assert fileB.readline() == "Foo Bar\n"
-
+            doc_b = item.add_document(doc_b_path)
+            assert not doc_b_path.exists()
             assert set(item.documents) == {doc_a, doc_b}
+            with open(doc_b.path, mode="r") as file:
+                assert file.readline() == "Foo Bar\n"
 
             item.remove_document(doc_a)
-            assert not doc_a.path.exists()
-            assert doc_b.path.is_file()
             assert item.documents == [doc_b]
 
             item.remove_document(doc_b)
-            assert not doc_b.path.exists()
             assert item.documents == []
 
 
@@ -138,21 +75,23 @@ class TestArchive(object):
             assert len(archive.items) == 0
 
             item_a = archive.add_item()
-            assert item_a.path.is_dir()
-            assert item_a.path.parent == archive.items_dir
             assert archive.items == [item_a]
 
             item_b = archive.add_item()
-            assert item_b.path.is_dir()
-            assert item_b.path.parent == archive.items_dir
             assert item_a != item_b
             assert set(archive.items) == {item_a, item_b}
 
             archive.remove_item(item_a)
-            assert not item_a.path.exists()
-            assert item_b.path.is_dir()
             assert archive.items == [item_b]
 
             archive.remove_item(item_b)
-            assert not item_b.path.exists()
             assert archive.items == []
+
+    def test_reopen(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive_a = Archive(tempdir)
+            archive_a.add_item()
+            del archive_a
+
+            archive_b = Archive(tempdir)
+            assert len(archive_b.items) == 1
