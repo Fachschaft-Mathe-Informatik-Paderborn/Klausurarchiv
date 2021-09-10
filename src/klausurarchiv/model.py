@@ -9,10 +9,10 @@ from uuid import uuid4
 SCHEMA_SQL = """
 BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "Items" (
-    "ID"	        INTEGER NOT NULL,
-    "downloadable"  INTEGER DEFAULT false,
-    "name"	        TEXT,
-    "date"	        TEXT,
+    "ID"	INTEGER NOT NULL,
+    "downloadable"	INTEGER DEFAULT false,
+    "name"	TEXT,
+    "date"	TEXT,
     PRIMARY KEY("ID" AUTOINCREMENT)
 );
 CREATE TABLE IF NOT EXISTS "Documents" (
@@ -20,23 +20,26 @@ CREATE TABLE IF NOT EXISTS "Documents" (
     "name"	TEXT,
     "path"	TEXT,
     "item"	INTEGER,
-    PRIMARY KEY("ID" AUTOINCREMENT),
-    FOREIGN KEY("item") REFERENCES "Items"("ID")
-);
-CREATE TABLE IF NOT EXISTS "SubjectNames" (
-    "ID"	INTEGER NOT NULL,
-    "name"	TEXT NOT NULL,
-    FOREIGN KEY("ID") REFERENCES "Subjects"("ID")
-);
-CREATE TABLE IF NOT EXISTS "Subjects" (
-    "ID"	INTEGER NOT NULL,
+    FOREIGN KEY("item") REFERENCES "Items"("ID"),
     PRIMARY KEY("ID" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "ItemSubjectMap" (
+CREATE TABLE IF NOT EXISTS "CourseAliases" (
+    "ID"	INTEGER NOT NULL,
+    "alias"	TEXT NOT NULL,
+    PRIMARY KEY("ID","alias"),
+    FOREIGN KEY("ID") REFERENCES "Courses"("ID")
+);
+CREATE TABLE IF NOT EXISTS "Courses" (
+    "ID"	            INTEGER NOT NULL,
+    "canonical_name"	TEXT,
+    PRIMARY KEY("ID" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "ItemCourseMap" (
     "ItemID"	INTEGER NOT NULL,
     "SubjectID"	INTEGER NOT NULL,
-    FOREIGN KEY("ItemID") REFERENCES "Items"("ID"),
-    FOREIGN KEY("SubjectID") REFERENCES "Subjects"("ID")
+    PRIMARY KEY("ItemID","SubjectID"),
+    FOREIGN KEY("SubjectID") REFERENCES "Courses"("ID"),
+    FOREIGN KEY("ItemID") REFERENCES "Items"("ID")
 );
 COMMIT;
 """
@@ -83,34 +86,54 @@ class Document(object):
         return hash((self.__db, self.doc_id))
 
 
-class ItemMeta(object):
-    def __init__(self, db: sqlite3.Connection, item_id: int):
-        self.downloadable = False
-        self.name = None
-        self.date = None
+class Course(object):
+    def __init__(self, course_id: int, db: sqlite3.Connection):
+        self.__courses_id = course_id
+        self.__db = db
 
-        cursor = db.cursor()
-        cursor.execute("select downloadable, name, date from Items where ID=?", (item_id,))
-        (downloadable, name, date) = cursor.fetchone()
-        self.downloadable = downloadable == 1
-        self.name = name
-        if date is None:
-            self.date = None
-        else:
-            self.date = datetime.date.fromisoformat(date)
+    @property
+    def course_id(self) -> int:
+        return self.__courses_id
+
+    @property
+    def canonical_name(self) -> str:
+        cursor = self.__db.cursor()
+        cursor.execute("select canonical_name from Courses where ID=?", (self.course_id,))
+        name = cursor.fetchone()[0]
+        cursor.close()
+        return name
+
+    @canonical_name.setter
+    def canonical_name(self, new_name):
+        cursor = self.__db.cursor()
+        cursor.execute("update Courses set canonical_name=? where ID=?", (new_name, self.course_id))
         cursor.close()
 
-    def store(self, db: sqlite3.Connection, item_id: int):
-        cursor = db.cursor()
-        if self.downloadable:
-            downloadable = 1
-        else:
-            downloadable = 0
-        name = self.name
-        date = self.date.isoformat()
-        cursor.execute("update Items set downloadable=?, name=?, date=? where ID=?",
-                       (downloadable, name, date, item_id))
+    @property
+    def aliases(self) -> List[str]:
+        cursor = self.__db.cursor()
+        names = [row[0] for row in cursor.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
         cursor.close()
+        return names
+
+    def add_alias(self, new_alias: str):
+        cursor = self.__db.cursor()
+        cursor.execute("insert into CourseAliases(ID, alias) values (?, ?)", (self.__courses_id, new_alias))
+        cursor.close()
+
+    def remove_alias(self, alias: str):
+        cursor = self.__db.cursor()
+        cursor.execute("delete from CourseAliases where ID=? and alias=?", (self.__courses_id, alias))
+        cursor.close()
+
+    def __eq__(self, other: 'Course') -> bool:
+        return self.__db == other.__db and self.course_id == other.course_id
+
+    def __ne__(self, other: 'Course') -> bool:
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.course_id, self.__db))
 
 
 class Item(object):
@@ -120,16 +143,54 @@ class Item(object):
         self.__docs_dir = docs_dir
 
     @property
-    def meta(self) -> ItemMeta:
-        return ItemMeta(self.__db, self.__item_id)
-
-    @meta.setter
-    def meta(self, new_meta: ItemMeta):
-        new_meta.store(self.__db, self.__item_id)
-
-    @property
     def item_id(self):
         return self.__item_id
+
+    @property
+    def downloadable(self) -> bool:
+        cursor = self.__db.cursor()
+        cursor.execute("select downloadable from Items where ID=?", (self.item_id,))
+        downloadable = cursor.fetchone()[0] == 1
+        cursor.close()
+        return downloadable
+
+    @downloadable.setter
+    def downloadable(self, downloadable: bool):
+        cursor = self.__db.cursor()
+        if downloadable:
+            downloadable = 1
+        else:
+            downloadable = 0
+        cursor.execute("update Items set downloadable=? where ID=?", (downloadable, self.item_id))
+        cursor.close()
+
+    @property
+    def name(self) -> str:
+        cursor = self.__db.cursor()
+        cursor.execute("select name from Items where ID=?", (self.item_id,))
+        name = cursor.fetchone()[0]
+        cursor.close()
+        return name
+
+    @name.setter
+    def name(self, new_name: str):
+        cursor = self.__db.cursor()
+        cursor.execute("update Items set name=? where ID=?", (new_name, self.item_id))
+        cursor.close()
+
+    @property
+    def date(self) -> datetime.date:
+        cursor = self.__db.cursor()
+        cursor.execute("select date from Items where ID=?", (self.item_id,))
+        date = datetime.date.fromisoformat(cursor.fetchone()[0])
+        cursor.close()
+        return date
+
+    @date.setter
+    def date(self, new_date: datetime.date):
+        cursor = self.__db.cursor()
+        cursor.execute("update Items set date=? where ID=?", (new_date.isoformat(), self.item_id))
+        cursor.close()
 
     @property
     def documents(self) -> List[Document]:
@@ -154,6 +215,24 @@ class Item(object):
     def remove_document(self, document: Document):
         cursor = self.__db.cursor()
         cursor.execute("delete from Documents where ID=?", (document.doc_id,))
+        cursor.close()
+
+    @property
+    def applicable_courses(self) -> List[Course]:
+        cursor = self.__db.cursor()
+        courses = [Course(row[0]) for row in
+                   cursor.execute("select CourseID from CourseItemMap where ItemID=?", (self.item_id,))]
+        cursor.close()
+        return courses
+
+    def add_to_course(self, course: Course):
+        cursor = self.__db.cursor()
+        cursor.execute("insert into CourseItemMap(ItemID, CourseID) values (?, ?)", (self.item_id, course.course_id))
+        cursor.close()
+
+    def remove_from_course(self, course: Course):
+        cursor = self.__db.cursor()
+        cursor.execute("delete from CourseItemMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
         cursor.close()
 
     def __eq__(self, other: 'Item') -> bool:
@@ -205,6 +284,25 @@ class Archive(object):
     def remove_item(self, item: Item):
         cursor = self.__db.cursor()
         cursor.execute("delete from Items where Id = ?", (item.item_id,))
+        cursor.close()
+
+    @property
+    def courses(self) -> List[Course]:
+        cursor = self.__db.cursor()
+        courses = [Course(row[0], self.__db) for row in cursor.execute("select ID from Courses")]
+        cursor.close()
+        return courses
+
+    def add_course(self, canonical_name: str) -> Course:
+        cursor = self.__db.cursor()
+        cursor.execute("insert into Courses(canonical_name) values (?)", (canonical_name,))
+        course = Course(cursor.lastrowid, self.__db)
+        cursor.close()
+        return course
+
+    def remove_course(self, course: Course):
+        cursor = self.__db.cursor()
+        cursor.execute("delete from Courses where ID=?", (course.course_id,))
         cursor.close()
 
     def __eq__(self, other: 'Archive') -> bool:

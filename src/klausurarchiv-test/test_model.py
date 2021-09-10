@@ -20,20 +20,47 @@ class TestDocument(object):
                 assert file.readline() == "Hello World\n"
 
 
+class TestCourse(object):
+    def test_canonical_name(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            course = archive.add_course("Rocket Science")
+            assert course.canonical_name == "Rocket Science"
+
+            course.canonical_name = "Foundations of Rocket Science"
+            assert course.canonical_name == "Foundations of Rocket Science"
+
+    def test_aliases(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            course = archive.add_course("Rocket Science")
+            assert course.aliases == []
+
+            alias1 = "RS"
+            alias2 = "FRS"
+            course.add_alias(alias1)
+            assert course.aliases == [alias1]
+            course.add_alias(alias2)
+            assert set(course.aliases) == {alias1, alias2}
+            course.remove_alias(alias1)
+            assert course.aliases == [alias2]
+            course.remove_alias(alias2)
+            assert course.aliases == []
+
+
 class TestItem(object):
     def test_meta(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
             item = archive.add_item()
 
-            meta = item.meta
-            meta.date = datetime.date(2021, 9, 8)
-            meta.downloadable = True
-            item.meta = meta
+            item.downloadable = True
+            item.name = "Rocket Science"
+            item.date = datetime.date(2021, 9, 8)
 
-            meta = item.meta
-            assert meta.date == datetime.date(2021, 9, 8)
-            assert meta.downloadable
+            assert item.downloadable
+            assert item.name == "Rocket Science"
+            assert item.date == datetime.date(2021, 9, 8)
 
     def test_documents(self):
         with tempfile.TemporaryDirectory() as tempdir:
