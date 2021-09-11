@@ -2,12 +2,14 @@ import tempfile
 
 from model import *
 
-from flask import Flask, send_file, request, render_template, jsonify, abort, Response
+from flask import Flask, send_file, request, render_template, jsonify, abort, Response, make_response
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 app = Flask(__name__, template_folder="../html")
+CORS(app)
 
-app.config["UPLOAD_FOLDER"] = "../UPLOAD_FOLDER"
+#app.config["UPLOAD_FOLDER"] = "../UPLOAD_FOLDER"
 app.config["MAX_CONTENT_PATH"] = 10 ** 6 * 100  # TODO 100MB
 
 
@@ -34,9 +36,10 @@ def main():
     return "Klausurarchiv"
 
 
-@app.route("/v1/item")
+"""@app.route("/v1/item", provide_automatic_options=True)
 def get_all_items():
     # get meta data of all items
+    print("get meta data of all items")
     response = app.response_class(
         response=json.dumps(
             [{"name": item.meta.name,
@@ -50,32 +53,64 @@ def get_all_items():
         mimetype='application/json'
     )
     return response
+"""
+
+@app.route("/v1/item")
+def get_all_items():
+    # get meta data of all items
+    print("get meta data of all items")
+    response = app.response_class(
+        response=json.dumps(
+            [{"name": item.meta.name,
+              "uuid": item.uuid,
+              "date": item.meta.date,
+              "author": item.meta.author,
+              "downloadable": item.meta.downloadable,
+              "documents": [doc.path.name for doc in item.documents]} for item in archive.items
+             ]*500,
+            default=str),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
 
 
 @app.route("/v1/item", methods=["POST"])
 def add_item():
     # add new item
-    if not request.form.get('name'):
-        print(request.form.get('name'))
-        abort(400, description="A Item needs a <str:name> attribute")
+    print("add new item\n", request.__dict__)
 
-    if not request.form.get('downloadable'):
-        abort(400, description="A Item needs a <int:downloadable> attribute")
+    if request.is_json:
+        data_transmitted_by_request = request.get_json()
+    else:
+        data_transmitted_by_request = request.form.to_dict()
+
+    if not data_transmitted_by_request.get('name'):
+        #abort(400, jsonify({"message":"A Item needs a <str:name> attribute"}))
+        """return Response(jsonify(
+            message="No ids provided.",
+            category="error",
+            status=404
+        ), status=404)"""
+        return make_response(jsonify(message="A Item needs a <str:name> attribute"), 400)
+
+    if not data_transmitted_by_request.get('downloadable'):
+        return make_response(jsonify(message="A Item needs a <int:downloadable> attribute"), 400)
+    try:
+        date_item = datetime.date.fromisoformat(data_transmitted_by_request.get('date'))
+    except ValueError:
+        return make_response(jsonify(message="The date of the item is not in the correct format YYYY-MM-DD"), 400)
 
     try:
-        date_item = datetime.date.fromisoformat(request.form.get('date'))
+        downloadable = bool(int(data_transmitted_by_request.get('downloadable')))
     except ValueError:
-        abort(400, description="The date of the item is not in the correct format YYYY-MM-DD")
+        return make_response(jsonify(message="The downloadable attribute of the item is not a integer between 0 and 1"), 400)
 
-    try:
-        downloadable = bool(int(request.form.get('downloadable')))
-    except ValueError:
-        abort(400, description="The downloadable attribute of the item is not a integer between 0 and 1")
 
     item = archive.add_item()
     meta = ItemMeta()
 
-    meta.name = request.form.get('name')
+    meta.name = data_transmitted_by_request.get('name')
     meta.date = date_item
     meta.author = request.form.get('author')
     meta.downloadable = downloadable
@@ -104,7 +139,7 @@ def delete_item(id):
     return Response(status=200)
 
 
-@app.route("/v1/item/<uuid:ID>/document")
+@app.route("/v1/item/<uuid:id>/document")
 def get_all_documents_of_item(id):
     # get meta data of all documents from existing item
     item = get_item(id)
@@ -124,6 +159,7 @@ def get_all_documents_of_item(id):
 @app.route("/v1/item/<uuid:id>/document", methods=["POST"])
 def upload_document_to_item(id):
     # Add document to item: <filename> needed
+
     item = get_item(id)
     if not item:
         abort(400, description="Given item uuid is not found")
@@ -188,5 +224,5 @@ def delete_document_of_item(id, name):
 
 if __name__ == '__main__':
     archive = Archive("../../archive")
-    app.run(port=5001, debug=True)
+    app.run(port=5001, debug=True), #host="0.0.0.0")
     # d = datetime.datetime.strptime("2019-09-06", "%Y-%m-%d")
