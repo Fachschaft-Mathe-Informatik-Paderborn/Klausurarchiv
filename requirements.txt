@@ -1,1 +1,4 @@
 pytest
+flask
+flask_cors
+werkzeug

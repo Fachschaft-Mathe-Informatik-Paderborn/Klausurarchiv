@@ -4,12 +4,13 @@ import shutil
 import sqlite3
 from pathlib import Path
 from typing import List, Optional
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 SCHEMA_SQL = """
 BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "Items" (
     "ID"	        INTEGER NOT NULL,
+    "UUID"          TEXT NOT NULL UNIQUE,
     "downloadable"	INTEGER DEFAULT false NOT NULL,
     "name"	        TEXT NOT NULL,
     "date"	        TEXT,
@@ -224,6 +225,14 @@ class Item(object):
         self.__docs_dir = docs_dir
 
     @property
+    def uuid(self) -> UUID:
+        cursor = self.__db.cursor()
+        cursor.execute("select uuid from Items where ID=?", (self.item_id,))
+        uuid = UUID(cursor.fetchone()[0])
+        cursor.close()
+        return uuid
+
+    @property
     def item_id(self):
         return self.__item_id
 
@@ -299,6 +308,15 @@ class Item(object):
         cursor = self.__db.cursor()
         cursor.execute("delete from Documents where ID=?", (document.doc_id,))
         cursor.close()
+
+    def get_document_with_name(self, name: str) -> Optional[Document]:
+        cursor = self.__db.cursor()
+        cursor.execute("select ID from Documents where name=?", (name,))
+        document = cursor.fetchone()
+        if document is not None:
+            document = Document(self.__db, document[0])
+        cursor.close()
+        return document
 
     @property
     def applicable_courses(self) -> List[Course]:
@@ -391,7 +409,7 @@ class Archive(object):
 
     def add_item(self, name: str) -> Item:
         cursor = self.__db.cursor()
-        cursor.execute('insert into Items(name) values (?)', (name,))
+        cursor.execute('insert into Items(name, uuid) values (?, ?)', (name, str(uuid4())))
         item = Item(int(cursor.lastrowid), self.__db, self.docs_dir)
         cursor.close()
         return item
@@ -400,6 +418,15 @@ class Archive(object):
         cursor = self.__db.cursor()
         cursor.execute("delete from Items where Id = ?", (item.item_id,))
         cursor.close()
+
+    def get_item_with_uuid(self, uuid: UUID) -> Optional[Item]:
+        cursor = self.__db.cursor()
+        cursor.execute("select ID from Items where uuid=?", (str(uuid),))
+        item = cursor.fetchone()
+        if item is not None:
+            item = Item(item[0], self.__db, self.docs_dir)
+        cursor.close()
+        return item
 
     @property
     def courses(self) -> List[Course]:
@@ -471,6 +498,15 @@ class Archive(object):
         cursor = self.__db.cursor()
         cursor.execute("delete from Authors where ID=?", (author.author_id,))
         cursor.close()
+
+    def get_author_by_name(self, name: str) -> Optional[Author]:
+        cursor = self.__db.cursor()
+        cursor.execute("select ID from Authors where name=?", (name,))
+        author = cursor.fetchone()
+        if author is not None:
+            author = Author(author[0], self.__db)
+        cursor.close()
+        return author
 
     def get_items_by_author(self, author: Author) -> List[Item]:
         cursor = self.__db.cursor()

@@ -69,6 +69,7 @@ class TestAuthor(object):
             author.name = "Prof. Dr. Jane Doe"
             assert author.name == "Prof. Dr. Jane Doe"
 
+
 class TestItem(object):
     def test_meta(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -94,6 +95,13 @@ class TestItem(object):
             assert item.date == datetime.date(2021, 9, 8)
             assert item.folder == folder
             assert item.author == author
+
+    def test_uuid(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            item_a = archive.add_item("Item A")
+            item_b = archive.add_item("Item B")
+            assert item_a.uuid != item_b.uuid
 
     def test_documents(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -163,6 +171,13 @@ class TestArchive(object):
 
             archive.remove_item(item_b)
             assert archive.items == []
+
+    def test_get_item_with_uuid(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            item = archive.add_item("Item")
+            assert archive.get_item_with_uuid(item.uuid) == item
+            assert archive.get_item_with_uuid(uuid4()) is None
 
     def test_reopen(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -265,5 +280,3 @@ class TestArchive(object):
 
             assert set(archive.get_items_by_author(author_mm)) == {item_frs, item_rs}
             assert archive.get_items_by_author(author_jd) == [item_es]
-
-
