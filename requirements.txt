@@ -1,4 +1,5 @@
 pytest
-flask
+flask~=2.0.1
 flask_cors
-werkzeug
+werkzeug~=2.0.1
+click~=8.0.1

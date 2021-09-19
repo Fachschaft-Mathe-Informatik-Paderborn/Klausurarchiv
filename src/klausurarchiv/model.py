@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4, UUID
+from flask import g, current_app
 
 SCHEMA_SQL = """
 BEGIN TRANSACTION;
@@ -323,6 +324,18 @@ class Archive(object):
 
     def commit(self):
         self.__db.commit()
+
+    @staticmethod
+    def get_singleton():
+        if "archive" not in g:
+            g.archive = Archive(Path(current_app.config["ARCHIVE_PATH"]))
+        return g.archive
+
+    @staticmethod
+    def close_singleton(e=None):
+        archive = g.pop("archive", None)
+        if archive is not None:
+            del archive
 
     @property
     def db_path(self):
