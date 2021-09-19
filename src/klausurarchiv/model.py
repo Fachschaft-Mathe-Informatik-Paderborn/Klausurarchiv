@@ -71,25 +71,17 @@ class Document(object):
 
     @property
     def name(self) -> str:
-        cursor = self.__db.cursor()
-        cursor.execute("select name from Documents where ID=?", (self.__doc_id,))
-        name = cursor.fetchone()[0]
-        cursor.close()
-        return name
+        cursor = self.__db.execute("select name from Documents where ID=?", (self.__doc_id,))
+        return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name: str):
-        cursor = self.__db.cursor()
-        cursor.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
-        cursor.close()
+        cursor = self.__db.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
 
     @property
     def path(self) -> Path:
-        cursor = self.__db.cursor()
-        cursor.execute("select path from Documents where ID=?", (self.__doc_id,))
-        path = Path(cursor.fetchone()[0])
-        cursor.close()
-        return path
+        cursor = self.__db.execute("select path from Documents where ID=?", (self.__doc_id,))
+        return Path(cursor.fetchone()[0])
 
     def __eq__(self, other: 'Document') -> bool:
         return self.__db == other.__db and self.doc_id == other.doc_id
@@ -112,30 +104,20 @@ class Course(object):
 
     @property
     def canonical_name(self) -> str:
-        cursor = self.__db.cursor()
-        cursor.execute("select canonical_name from Courses where ID=?", (self.course_id,))
-        name = cursor.fetchone()[0]
-        cursor.close()
-        return name
+        cursor = self.__db.execute("select canonical_name from Courses where ID=?", (self.course_id,))
+        return cursor.fetchone()[0]
 
     @canonical_name.setter
     def canonical_name(self, new_name):
-        cursor = self.__db.cursor()
-        cursor.execute("update Courses set canonical_name=? where ID=?", (new_name, self.course_id))
-        cursor.close()
+        self.__db.execute("update Courses set canonical_name=? where ID=?", (new_name, self.course_id))
 
     @property
     def aliases(self) -> List[str]:
-        cursor = self.__db.cursor()
-        names = [row[0] for row in
-                 cursor.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
-        cursor.close()
-        return names
+        return [row[0] for row in
+                self.__db.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
 
     def add_alias(self, new_alias: str):
-        cursor = self.__db.cursor()
-        cursor.execute("insert into CourseAliases(ID, alias) values (?, ?)", (self.__courses_id, new_alias))
-        cursor.close()
+        self.__db.execute("insert into CourseAliases(ID, alias) values (?, ?)", (self.__courses_id, new_alias))
 
     def remove_alias(self, alias: str):
         cursor = self.__db.cursor()
@@ -163,17 +145,12 @@ class Folder(object):
 
     @property
     def name(self) -> str:
-        cursor = self.__db.cursor()
-        cursor.execute("select name from Folders where ID=?", (self.folder_id,))
-        name = cursor.fetchone()[0]
-        cursor.close()
-        return name
+        cursor = self.__db.execute("select name from Folders where ID=?", (self.folder_id,))
+        return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name):
-        cursor = self.__db.cursor()
-        cursor.execute("update Folders set name=? where ID=?", (new_name, self.folder_id))
-        cursor.close()
+        self.__db.execute("update Folders set name=? where ID=?", (new_name, self.folder_id))
 
     def __eq__(self, other: 'Folder'):
         return self.__db == other.__db and self.folder_id == other.folder_id
@@ -196,17 +173,12 @@ class Author(object):
 
     @property
     def name(self) -> str:
-        cursor = self.__db.cursor()
-        cursor.execute("select name from Authors where ID=?", (self.author_id,))
-        name = cursor.fetchone()[0]
-        cursor.close()
-        return name
+        cursor = self.__db.execute("select name from Authors where ID=?", (self.author_id,))
+        return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name):
-        cursor = self.__db.cursor()
-        cursor.execute("update Authors set name=? where ID=?", (new_name, self.author_id))
-        cursor.close()
+        self.__db.execute("update Authors set name=? where ID=?", (new_name, self.author_id))
 
     def __eq__(self, other: 'Author'):
         return self.__db == other.__db and self.author_id == other.author_id
@@ -226,11 +198,8 @@ class Item(object):
 
     @property
     def uuid(self) -> UUID:
-        cursor = self.__db.cursor()
-        cursor.execute("select uuid from Items where ID=?", (self.item_id,))
-        uuid = UUID(cursor.fetchone()[0])
-        cursor.close()
-        return uuid
+        cursor = self.__db.execute("select uuid from Items where ID=?", (self.item_id,))
+        return UUID(cursor.fetchone()[0])
 
     @property
     def item_id(self):
@@ -238,135 +207,95 @@ class Item(object):
 
     @property
     def downloadable(self) -> bool:
-        cursor = self.__db.cursor()
-        cursor.execute("select downloadable from Items where ID=?", (self.item_id,))
-        downloadable = cursor.fetchone()[0] == 1
-        cursor.close()
-        return downloadable
+        cursor = self.__db.execute("select downloadable from Items where ID=?", (self.item_id,))
+        return cursor.fetchone()[0] == 1
 
     @downloadable.setter
     def downloadable(self, downloadable: bool):
-        cursor = self.__db.cursor()
         if downloadable:
             downloadable = 1
         else:
             downloadable = 0
-        cursor.execute("update Items set downloadable=? where ID=?", (downloadable, self.item_id))
-        cursor.close()
+        self.__db.execute("update Items set downloadable=? where ID=?", (downloadable, self.item_id))
 
     @property
     def name(self) -> str:
-        cursor = self.__db.cursor()
-        cursor.execute("select name from Items where ID=?", (self.item_id,))
-        name = cursor.fetchone()[0]
-        cursor.close()
-        return name
+        cursor = self.__db.execute("select name from Items where ID=?", (self.item_id,))
+        return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name: str):
-        cursor = self.__db.cursor()
-        cursor.execute("update Items set name=? where ID=?", (new_name, self.item_id))
-        cursor.close()
+        self.__db.execute("update Items set name=? where ID=?", (new_name, self.item_id))
 
     @property
     def date(self) -> Optional[datetime.date]:
-        cursor = self.__db.cursor()
-        cursor.execute("select date from Items where ID=?", (self.item_id,))
+        cursor = self.__db.execute("select date from Items where ID=?", (self.item_id,))
         date = cursor.fetchone()[0]
         if date is not None:
             date = datetime.date.fromisoformat(date)
-        cursor.close()
         return date
 
     @date.setter
     def date(self, new_date: Optional[datetime.date]):
-        cursor = self.__db.cursor()
-        cursor.execute("update Items set date=? where ID=?", (new_date.isoformat(), self.item_id))
-        cursor.close()
+        self.__db.execute("update Items set date=? where ID=?", (new_date.isoformat(), self.item_id))
 
     @property
     def documents(self) -> List[Document]:
-        cursor = self.__db.cursor()
-        docs = [Document(self.__db, int(row[0])) for row in
-                cursor.execute("select ID from Documents where item=?", (self.__item_id,))]
-        cursor.close()
-        return docs
+        return [Document(self.__db, int(row[0])) for row in
+                self.__db.execute("select ID from Documents where item=?", (self.__item_id,))]
 
     def add_document(self, original_path: Path) -> Document:
         target_path = self.__docs_dir / Path(f"{uuid4()}{original_path.suffix}")
         shutil.move(original_path, target_path)
 
-        cursor = self.__db.cursor()
-        cursor.execute("insert into Documents(name, path, item) values (?, ?, ?)",
-                       (original_path.name, str(target_path), self.__item_id))
-        doc = Document(self.__db, cursor.lastrowid)
-        cursor.close()
-
-        return doc
+        cursor = self.__db.execute("insert into Documents(name, path, item) values (?, ?, ?)",
+                                   (original_path.name, str(target_path), self.__item_id))
+        return Document(self.__db, cursor.lastrowid)
 
     def remove_document(self, document: Document):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from Documents where ID=?", (document.doc_id,))
-        cursor.close()
+        self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
 
     def get_document_with_name(self, name: str) -> Optional[Document]:
-        cursor = self.__db.cursor()
-        cursor.execute("select ID from Documents where name=?", (name,))
+        cursor = self.__db.execute("select ID from Documents where name=?", (name,))
         document = cursor.fetchone()
         if document is not None:
             document = Document(self.__db, document[0])
-        cursor.close()
         return document
 
     @property
     def applicable_courses(self) -> List[Course]:
-        cursor = self.__db.cursor()
-        courses = [Course(row[0], self.__db) for row in
-                   cursor.execute("select CourseID from ItemCourseMap where ItemID=?", (self.item_id,))]
-        cursor.close()
-        return courses
+        return [Course(row[0], self.__db) for row in
+                self.__db.execute("select CourseID from ItemCourseMap where ItemID=?", (self.item_id,))]
 
     def add_to_course(self, course: Course):
-        cursor = self.__db.cursor()
-        cursor.execute("insert into ItemCourseMap(ItemID, CourseID) values (?, ?)", (self.item_id, course.course_id))
-        cursor.close()
+        self.__db.execute("insert into ItemCourseMap(ItemID, CourseID) values (?, ?)", (self.item_id, course.course_id))
 
     def remove_from_course(self, course: Course):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from ItemCourseMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
-        cursor.close()
+        self.__db.execute("delete from ItemCourseMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
 
     @property
     def author(self) -> Optional[Author]:
-        cursor = self.__db.cursor()
-        cursor.execute("select authorID from Items where ID=?", (self.item_id,))
+        cursor = self.__db.execute("select authorID from Items where ID=?", (self.item_id,))
         author = cursor.fetchone()[0]
         if author is not None:
             author = Author(author, self.__db)
-        cursor.close()
         return author
 
     @author.setter
     def author(self, folder: Optional[Author]):
-        cursor = self.__db.cursor()
-        cursor.execute("update Items set authorID=? where ID=?", (folder.author_id, self.item_id))
-        cursor.close()
+        self.__db.execute("update Items set authorID=? where ID=?", (folder.author_id, self.item_id))
 
     @property
     def folder(self) -> Optional[Folder]:
-        cursor = self.__db.cursor()
-        cursor.execute("select folderID from Items where ID=?", (self.item_id,))
+        cursor = self.__db.execute("select folderID from Items where ID=?", (self.item_id,))
         folder = cursor.fetchone()[0]
         if folder is not None:
             folder = Folder(folder, self.__db)
-        cursor.close()
         return folder
 
     @folder.setter
     def folder(self, folder: Optional[Folder]):
-        cursor = self.__db.cursor()
-        cursor.execute("update Items set folderID=? where ID=?", (folder.folder_id, self.item_id))
-        cursor.close()
+        self.__db.execute("update Items set folderID=? where ID=?", (folder.folder_id, self.item_id))
 
     def __eq__(self, other: 'Item') -> bool:
         return self.__db == other.__db and self.item_id == other.item_id
@@ -381,16 +310,23 @@ class Item(object):
 class Archive(object):
     def __init__(self, path: Path):
         self.__path: Path = Path(path)
-        self.__db: sqlite3.Connection = sqlite3.connect(self.path / Path("archive.sqlite"))
-        cursor = self.__db.cursor()
-        cursor.executescript(SCHEMA_SQL)
-        cursor.close()
+        if self.db_path.is_file():
+            self.__db: sqlite3.Connection = sqlite3.connect(self.db_path)
 
+    def init_archive(self):
+        if not self.__path.exists():
+            os.makedirs(self.__path)
         if not self.docs_dir.exists():
-            os.mkdir(self.docs_dir)
+            os.makedirs(self.docs_dir)
+        self.__db = sqlite3.connect(self.db_path)
+        self.__db.executescript(SCHEMA_SQL)
 
-    def __del__(self):
+    def commit(self):
         self.__db.commit()
+
+    @property
+    def db_path(self):
+        return self.__path / Path("archive.sqlite")
 
     @property
     def docs_dir(self) -> Path:
@@ -402,118 +338,74 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        cursor = self.__db.cursor()
-        items = [Item(item_id[0], self.__db, self.docs_dir) for item_id in cursor.execute("select ID from Items")]
-        cursor.close()
-        return items
+        return [Item(item_id[0], self.__db, self.docs_dir) for item_id in self.__db.execute("select ID from Items")]
 
     def add_item(self, name: str) -> Item:
-        cursor = self.__db.cursor()
-        cursor.execute('insert into Items(name, uuid) values (?, ?)', (name, str(uuid4())))
-        item = Item(int(cursor.lastrowid), self.__db, self.docs_dir)
-        cursor.close()
-        return item
+        cursor = self.__db.execute('insert into Items(name, uuid) values (?, ?)', (name, str(uuid4())))
+        return Item(int(cursor.lastrowid), self.__db, self.docs_dir)
 
     def remove_item(self, item: Item):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from Items where Id = ?", (item.item_id,))
-        cursor.close()
+        self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
     def get_item_with_uuid(self, uuid: UUID) -> Optional[Item]:
-        cursor = self.__db.cursor()
-        cursor.execute("select ID from Items where uuid=?", (str(uuid),))
+        cursor = self.__db.execute("select ID from Items where uuid=?", (str(uuid),))
         item = cursor.fetchone()
         if item is not None:
             item = Item(item[0], self.__db, self.docs_dir)
-        cursor.close()
         return item
 
     @property
     def courses(self) -> List[Course]:
-        cursor = self.__db.cursor()
-        courses = [Course(row[0], self.__db) for row in cursor.execute("select ID from Courses")]
-        cursor.close()
-        return courses
+        return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
 
     def add_course(self, canonical_name: str) -> Course:
-        cursor = self.__db.cursor()
-        cursor.execute("insert into Courses(canonical_name) values (?)", (canonical_name,))
+        cursor = self.__db.execute("insert into Courses(canonical_name) values (?)", (canonical_name,))
         course = Course(cursor.lastrowid, self.__db)
-        cursor.close()
         return course
 
     def remove_course(self, course: Course):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from Courses where ID=?", (course.course_id,))
-        cursor.close()
+        self.__db.execute("delete from Courses where ID=?", (course.course_id,))
 
     def get_items_for_course(self, course: Course) -> List[Item]:
-        cursor = self.__db.cursor()
-        items = [Item(row[0], self.__db, self.docs_dir) for row in
-                 cursor.execute("select ItemID from ItemCourseMap where CourseID=?", (course.course_id,))]
-        cursor.close()
-        return items
+        return [Item(row[0], self.__db, self.docs_dir) for row in
+                self.__db.execute("select ItemID from ItemCourseMap where CourseID=?", (course.course_id,))]
 
     @property
     def folders(self) -> List[Folder]:
-        cursor = self.__db.cursor()
-        folders = [Folder(row[0], self.__db) for row in cursor.execute("select ID from Folders")]
-        cursor.close()
-        return folders
+        return [Folder(row[0], self.__db) for row in self.__db.execute("select ID from Folders")]
 
     def add_folder(self, name: str) -> Folder:
-        cursor = self.__db.cursor()
-        cursor.execute("insert into Folders(name) values (?)", (name,))
-        folder = Folder(cursor.lastrowid, self.__db)
-        cursor.close()
-        return folder
+        cursor = self.__db.execute("insert into Folders(name) values (?)", (name,))
+        return Folder(cursor.lastrowid, self.__db)
 
     def remove_folder(self, folder: Folder):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from Folders where ID=?", (folder.folder_id,))
-        cursor.close()
+        self.__db.execute("delete from Folders where ID=?", (folder.folder_id,))
 
     def get_items_in_folder(self, folder: Folder) -> List[Item]:
-        cursor = self.__db.cursor()
-        items = [Item(row[0], self.__db, self.docs_dir) for row in
-                 cursor.execute("select ID from Items where folderID=?", (folder.folder_id,))]
-        cursor.close()
-        return items
+        return [Item(row[0], self.__db, self.docs_dir) for row in
+                self.__db.execute("select ID from Items where folderID=?", (folder.folder_id,))]
 
     @property
     def authors(self) -> List[Author]:
-        cursor = self.__db.cursor()
-        authors = [Author(row[0], self.__db) for row in cursor.execute("select ID from Authors")]
-        cursor.close()
-        return authors
+        return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
 
     def add_author(self, name: str) -> Author:
-        cursor = self.__db.cursor()
-        cursor.execute("insert into Authors(name) values (?)", (name,))
-        author = Author(cursor.lastrowid, self.__db)
-        cursor.close()
-        return author
+        cursor = self.__db.execute("insert into Authors(name) values (?)", (name,))
+        return Author(cursor.lastrowid, self.__db)
 
     def remove_author(self, author: Author):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from Authors where ID=?", (author.author_id,))
-        cursor.close()
+        self.__db.execute("delete from Authors where ID=?", (author.author_id,))
 
     def get_author_by_name(self, name: str) -> Optional[Author]:
-        cursor = self.__db.cursor()
-        cursor.execute("select ID from Authors where name=?", (name,))
+        cursor = self.__db.execute("select ID from Authors where name=?", (name,))
         author = cursor.fetchone()
         if author is not None:
             author = Author(author[0], self.__db)
-        cursor.close()
         return author
 
     def get_items_by_author(self, author: Author) -> List[Item]:
-        cursor = self.__db.cursor()
-        items = [Item(row[0], self.__db, self.docs_dir) for row in
-                 cursor.execute("select ID from Items where authorID=?", (author.author_id,))]
-        cursor.close()
-        return items
+        return [Item(row[0], self.__db, self.docs_dir) for row in
+                self.__db.execute("select ID from Items where authorID=?", (author.author_id,))]
 
     def __eq__(self, other: 'Archive') -> bool:
         return self.path == other.path
