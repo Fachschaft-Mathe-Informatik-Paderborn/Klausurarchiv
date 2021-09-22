@@ -84,12 +84,14 @@ class TestItem(object):
             folder = archive.add_folder("Rocket Science")
             author = archive.add_author("Prof. Dr. Jane Doe")
 
+            # Assert default values
             assert not item.downloadable
             assert item.name == "Rocket Science"
             assert item.date is None
             assert item.folder is None
             assert item.author is None
 
+            # Assert setting metadata
             item.downloadable = True
             item.name = "Foundations of Rocket Science"
             item.date = datetime.date(2021, 9, 8)
@@ -101,6 +103,13 @@ class TestItem(object):
             assert item.date == datetime.date(2021, 9, 8)
             assert item.folder == folder
             assert item.author == author
+
+            # Assert nullification of metadata
+            item.folder = None
+            item.author = None
+
+            assert item.folder is None
+            assert item.author is None
 
     def test_uuid(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -125,13 +134,13 @@ class TestItem(object):
             assert item.documents == []
 
             doc_a = item.add_document(doc_a_path)
-            assert not doc_a_path.exists()
+            assert doc_a_path.is_file()
             assert item.documents == [doc_a]
             with open(doc_a.path, mode="r") as file:
                 assert file.readline() == "Hello World\n"
 
             doc_b = item.add_document(doc_b_path)
-            assert not doc_b_path.exists()
+            assert doc_b_path.is_file()
             assert set(item.documents) == {doc_a, doc_b}
             with open(doc_b.path, mode="r") as file:
                 assert file.readline() == "Foo Bar\n"

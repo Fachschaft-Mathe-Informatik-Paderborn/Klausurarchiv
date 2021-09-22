@@ -15,8 +15,9 @@ def get_all_items():
             [{"name": item.name,
               "uuid": item.uuid,
               "date": item.date,
-              "author": item.author.name,
+              "author": item.author.name if item.author is not None else None,
               "downloadable": item.downloadable,
+              "folder": item.folder.name if item.folder is not None else None,
               "documents": [doc.name for doc in item.documents]} for item in archive.items
              ],
             default=str),

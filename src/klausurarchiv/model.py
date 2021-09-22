@@ -247,7 +247,7 @@ class Item(object):
 
     def add_document(self, original_path: Path) -> Document:
         target_path = self.__docs_dir / Path(f"{uuid4()}{original_path.suffix}")
-        shutil.move(original_path, target_path)
+        shutil.copy(original_path, target_path)
 
         cursor = self.__db.execute("insert into Documents(name, path, item) values (?, ?, ?)",
                                    (original_path.name, str(target_path), self.__item_id))
@@ -283,8 +283,11 @@ class Item(object):
         return author
 
     @author.setter
-    def author(self, folder: Optional[Author]):
-        self.__db.execute("update Items set authorID=? where ID=?", (folder.author_id, self.item_id))
+    def author(self, author: Optional[Author]):
+        if author is None:
+            self.__db.execute("update Items set authorID=NULL where ID=?", (self.item_id,))
+        else:
+            self.__db.execute("update Items set authorID=? where ID=?", (author.author_id, self.item_id))
 
     @property
     def folder(self) -> Optional[Folder]:
@@ -296,7 +299,10 @@ class Item(object):
 
     @folder.setter
     def folder(self, folder: Optional[Folder]):
-        self.__db.execute("update Items set folderID=? where ID=?", (folder.folder_id, self.item_id))
+        if folder is None:
+            self.__db.execute("update Items set folderID=NULL where ID=?", (self.item_id,))
+        else:
+            self.__db.execute("update Items set folderID=? where ID=?", (folder.folder_id, self.item_id))
 
     def __eq__(self, other: 'Item') -> bool:
         return self.__db == other.__db and self.item_id == other.item_id

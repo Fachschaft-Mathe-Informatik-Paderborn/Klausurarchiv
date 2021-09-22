@@ -1,7 +1,5 @@
 from flask import Flask
-from klausurarchiv import webapp, model
-from flask.cli import with_appcontext
-import click
+from klausurarchiv import webapp, model, cli
 from flask_cors import CORS
 
 
@@ -19,13 +17,9 @@ def create_app(test_config=None):
     else:
         app.config.from_mapping(test_config)
 
-    @app.cli.add_command
-    @click.command("init-archive")
-    @with_appcontext
-    def init_archive_command():
-        model.Archive.get_singleton().init_archive()
     app.teardown_appcontext(model.Archive.close_singleton)
 
+    app.register_blueprint(cli.bp)
     app.register_blueprint(webapp.bp)
 
     return app
