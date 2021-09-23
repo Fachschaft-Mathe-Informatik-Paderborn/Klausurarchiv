@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4, UUID
+
 from flask import g, current_app
 
 SCHEMA_SQL = """
@@ -12,7 +13,6 @@ BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "Items" (
     "ID"	        INTEGER NOT NULL,
     "UUID"          TEXT NOT NULL UNIQUE,
-    "downloadable"	INTEGER DEFAULT false NOT NULL,
     "name"	        TEXT NOT NULL,
     "date"	        TEXT,
     "folderID"      ID,
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS "Documents" (
     "name"	TEXT NOT NULL,
     "path"	TEXT NOT NULL,
     "item"	INTEGER NOT NULL,
+    "downloadable"	INTEGER DEFAULT false NOT NULL,
     FOREIGN KEY("item") REFERENCES "Items"("ID"),
     PRIMARY KEY("ID" AUTOINCREMENT)
 );
@@ -51,6 +52,13 @@ CREATE TABLE IF NOT EXISTS "Folders" (
     "ID"    INTEGER NOT NULL,
     "name"  TEXT NOT NULL,
     PRIMARY KEY("ID" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "ItemAuthorMap" (
+    "ItemID"    INTEGER NOT NULL,
+    "AuthorID"  INTEGER NOT NULL,
+    PRIMARY KEY("ItemID", "AuthorID"),
+    FOREIGN KEY("ItemID") REFERENCES "Item"("ID"),
+    FOREIGN KEY("AuthorID") REFERENCES "Authors"("ID")
 );
 CREATE TABLE IF NOT EXISTS "Authors" (
     "ID"    INTEGER NOT NULL,
@@ -78,6 +86,19 @@ class Document(object):
     @name.setter
     def name(self, new_name: str):
         cursor = self.__db.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
+
+    @property
+    def downloadable(self) -> bool:
+        cursor = self.__db.execute("select downloadable from Documents where ID=?", (self.doc_id,))
+        return cursor.fetchone()[0] == 1
+
+    @downloadable.setter
+    def downloadable(self, downloadable: bool):
+        if downloadable:
+            downloadable = 1
+        else:
+            downloadable = 0
+        self.__db.execute("update Documents set downloadable=? where ID=?", (downloadable, self.doc_id))
 
     @property
     def path(self) -> Path:
@@ -207,19 +228,6 @@ class Item(object):
         return self.__item_id
 
     @property
-    def downloadable(self) -> bool:
-        cursor = self.__db.execute("select downloadable from Items where ID=?", (self.item_id,))
-        return cursor.fetchone()[0] == 1
-
-    @downloadable.setter
-    def downloadable(self, downloadable: bool):
-        if downloadable:
-            downloadable = 1
-        else:
-            downloadable = 0
-        self.__db.execute("update Items set downloadable=? where ID=?", (downloadable, self.item_id))
-
-    @property
     def name(self) -> str:
         cursor = self.__db.execute("select name from Items where ID=?", (self.item_id,))
         return cursor.fetchone()[0]
@@ -275,19 +283,15 @@ class Item(object):
         self.__db.execute("delete from ItemCourseMap where ItemID=? and CourseID=?", (self.item_id, course.course_id))
 
     @property
-    def author(self) -> Optional[Author]:
-        cursor = self.__db.execute("select authorID from Items where ID=?", (self.item_id,))
-        author = cursor.fetchone()[0]
-        if author is not None:
-            author = Author(author, self.__db)
-        return author
+    def authors(self) -> List[Author]:
+        return [Author(row[0], self.__db) for row in
+                self.__db.execute("select AuthorID from ItemAuthorMap where ItemID=?", (self.item_id,))]
 
-    @author.setter
-    def author(self, author: Optional[Author]):
-        if author is None:
-            self.__db.execute("update Items set authorID=NULL where ID=?", (self.item_id,))
-        else:
-            self.__db.execute("update Items set authorID=? where ID=?", (author.author_id, self.item_id))
+    def add_author(self, author: Author):
+        self.__db.execute("insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)", (self.item_id, author.author_id))
+
+    def remove_author(self, author: Author):
+        self.__db.execute("delete from ItemAuthorMap where ItemID=? and AuthorID=?", (self.item_id, author.author_id))
 
     @property
     def folder(self) -> Optional[Folder]:
@@ -366,13 +370,6 @@ class Archive(object):
     def remove_item(self, item: Item):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
-    def get_item_with_uuid(self, uuid: UUID) -> Optional[Item]:
-        cursor = self.__db.execute("select ID from Items where uuid=?", (str(uuid),))
-        item = cursor.fetchone()
-        if item is not None:
-            item = Item(item[0], self.__db, self.docs_dir)
-        return item
-
     @property
     def courses(self) -> List[Course]:
         return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
@@ -385,10 +382,6 @@ class Archive(object):
     def remove_course(self, course: Course):
         self.__db.execute("delete from Courses where ID=?", (course.course_id,))
 
-    def get_items_for_course(self, course: Course) -> List[Item]:
-        return [Item(row[0], self.__db, self.docs_dir) for row in
-                self.__db.execute("select ItemID from ItemCourseMap where CourseID=?", (course.course_id,))]
-
     @property
     def folders(self) -> List[Folder]:
         return [Folder(row[0], self.__db) for row in self.__db.execute("select ID from Folders")]
@@ -400,10 +393,6 @@ class Archive(object):
     def remove_folder(self, folder: Folder):
         self.__db.execute("delete from Folders where ID=?", (folder.folder_id,))
 
-    def get_items_in_folder(self, folder: Folder) -> List[Item]:
-        return [Item(row[0], self.__db, self.docs_dir) for row in
-                self.__db.execute("select ID from Items where folderID=?", (folder.folder_id,))]
-
     @property
     def authors(self) -> List[Author]:
         return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
@@ -414,17 +403,6 @@ class Archive(object):
 
     def remove_author(self, author: Author):
         self.__db.execute("delete from Authors where ID=?", (author.author_id,))
-
-    def get_author_by_name(self, name: str) -> Optional[Author]:
-        cursor = self.__db.execute("select ID from Authors where name=?", (name,))
-        author = cursor.fetchone()
-        if author is not None:
-            author = Author(author[0], self.__db)
-        return author
-
-    def get_items_by_author(self, author: Author) -> List[Item]:
-        return [Item(row[0], self.__db, self.docs_dir) for row in
-                self.__db.execute("select ID from Items where authorID=?", (author.author_id,))]
 
     def __eq__(self, other: 'Archive') -> bool:
         return self.path == other.path

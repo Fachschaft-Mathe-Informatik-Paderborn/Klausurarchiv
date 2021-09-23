@@ -20,6 +20,12 @@ class TestDocument(object):
             with open(doc_a.path, mode="r") as file:
                 assert file.readline() == "Hello World\n"
 
+            assert not doc_a.downloadable
+            doc_a.downloadable = True
+            assert doc_a.downloadable
+            doc_a.downloadable = False
+            assert not doc_a.downloadable
+
 
 class TestCourse(object):
     def test_canonical_name(self):
@@ -85,31 +91,28 @@ class TestItem(object):
             author = archive.add_author("Prof. Dr. Jane Doe")
 
             # Assert default values
-            assert not item.downloadable
             assert item.name == "Rocket Science"
             assert item.date is None
             assert item.folder is None
-            assert item.author is None
+            assert item.authors == []
 
             # Assert setting metadata
-            item.downloadable = True
             item.name = "Foundations of Rocket Science"
             item.date = datetime.date(2021, 9, 8)
             item.folder = folder
-            item.author = author
+            item.add_author(author)
 
-            assert item.downloadable
             assert item.name == "Foundations of Rocket Science"
             assert item.date == datetime.date(2021, 9, 8)
             assert item.folder == folder
-            assert item.author == author
+            assert item.authors == [author]
 
             # Assert nullification of metadata
             item.folder = None
-            item.author = None
+            item.remove_author(author)
 
             assert item.folder is None
-            assert item.author is None
+            assert item.authors == []
 
     def test_uuid(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -191,14 +194,6 @@ class TestArchive(object):
             archive.remove_item(item_b)
             assert archive.items == []
 
-    def test_get_item_with_uuid(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            archive = Archive(tempdir)
-            archive.init_archive()
-            item = archive.add_item("Item")
-            assert archive.get_item_with_uuid(item.uuid) == item
-            assert archive.get_item_with_uuid(uuid4()) is None
-
     def test_reopen(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive_a = Archive(tempdir)
@@ -225,24 +220,6 @@ class TestArchive(object):
             archive.remove_course(course2)
             assert archive.courses == []
 
-    def test_items_for_course(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            archive = Archive(tempdir)
-            archive.init_archive()
-
-            item_frs = archive.add_item("Foundations of Rocket Science")
-            item_rs = archive.add_item("Rocket Science")
-            item_es = archive.add_item("Embedded Systems")
-            course_rs = archive.add_course("Rocket Science")
-            course_es = archive.add_course("Embedded Systems")
-
-            item_frs.add_to_course(course_rs)
-            item_rs.add_to_course(course_rs)
-            item_es.add_to_course(course_es)
-
-            assert set(archive.get_items_for_course(course_rs)) == {item_frs, item_rs}
-            assert archive.get_items_for_course(course_es) == [item_es]
-
     def test_folders(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
@@ -258,24 +235,6 @@ class TestArchive(object):
             archive.remove_folder(folder2)
             assert archive.folders == []
 
-    def test_items_in_folder(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            archive = Archive(tempdir)
-            archive.init_archive()
-
-            item_frs = archive.add_item("Foundations of Rocket Science")
-            item_rs = archive.add_item("Rocket Science")
-            item_es = archive.add_item("Embedded Systems")
-            folder_rs = archive.add_folder("Rocket Science")
-            folder_es = archive.add_folder("Embedded Systems")
-
-            item_frs.folder = folder_rs
-            item_rs.folder = folder_rs
-            item_es.folder = folder_es
-
-            assert set(archive.get_items_in_folder(folder_rs)) == {item_frs, item_rs}
-            assert archive.get_items_in_folder(folder_es) == [item_es]
-
     def test_authors(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
@@ -290,21 +249,3 @@ class TestArchive(object):
             assert archive.authors == [author2]
             archive.remove_author(author2)
             assert archive.authors == []
-
-    def test_items_by_author(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            archive = Archive(tempdir)
-            archive.init_archive()
-
-            item_frs = archive.add_item("Foundations of Rocket Science")
-            item_rs = archive.add_item("Rocket Science")
-            item_es = archive.add_item("Embedded Systems")
-            author_mm = archive.add_author("Dr. Max Mustermann")
-            author_jd = archive.add_author("Prof. Dr. Jane Doe")
-
-            item_frs.author = author_mm
-            item_rs.author = author_mm
-            item_es.author = author_jd
-
-            assert set(archive.get_items_by_author(author_mm)) == {item_frs, item_rs}
-            assert archive.get_items_by_author(author_jd) == [item_es]
