@@ -18,7 +18,7 @@
 |-------------------|-----------|-----------------------------------------------------------------------|
 | `name`            | `str`     | Display name of the document.                                         |
 | `downloadable`    | `bool`    | True iff the document is downloadable by unauthorized users.          |
-| `file_id`         | `str`     | UUID of the document's file, as returned by posting to `/v1/files/`.  |
+| `file_id`         | `str`     | UUID of the document's file, used by the `/v1/files/` endpoint.       |
 
 ## Course
 
@@ -41,7 +41,7 @@
 
 # Login and Authorization
 
-The Klausurarchiv server requires authorization for certain activities. This authorization is provided with the following endpoints and is stored in the `KLAUSURARCHIV` cookie. This cookie should be set in all requests since it is used to check the authorization of the user.
+The Klausurarchiv server requires authorization for certain requests. This authorization is provided with the following endpoints and is stored in the `KLAUSURARCHIV` cookie. This cookie should be set in all requests since it is used to check the authorization of the user.
 
 ## `POST /v1/login`
 
@@ -78,7 +78,7 @@ The provided username and/or password is wrong, or the user is not authorized to
 
 ### Response 500 "Internal Server Error"
 
-An internal error occurred. The body is an empty object.The body is an object of the following schema:
+An internal error occurred. The body is an empty object. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
@@ -94,11 +94,11 @@ The body is an empty object.
 
 ### Response 200 "Ok"
 
-The logout was successful and the session information are removed from the `KLAUSURARCHIV` cookie. This response will also be sent if the user wasn't logged in before as the resulting state is the same.
+The logout was successful and the session information is removed from the `KLAUSURARCHIV` cookie. This response will also be sent if the user wasn't logged in before as the resulting state is the same.
 
 ### Response 500 "Internal Server Error"
 
-An internal error occurred. The body is an empty object.The body is an object of the following schema:
+An internal error occurred. The body is an empty object. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
@@ -106,11 +106,11 @@ An internal error occurred. The body is an empty object.The body is an object of
 
 # File up- and downloads
 
-While documents represent the files in the database, they only contain metadata information about them. The actual files are up- and downloaded at separate endpoints. Downloading files is possible iff the user is logged in and is authorized to download all files, or the file belongs to a downloadable file of a visible item. Uploading files is only possible by authorized users.
+While documents represent the files in the database, they only contain metadata information about them. The actual files are up- and downloaded at separate endpoints. Downloading files is possible iff the user is logged in and is authorized to download all files, or the file belongs to a downloadable document of a visible item. Uploading files is only possible by authorized users.
 
 It is not possible to delete files. Orphaned files will be automatically deleted during housekeeping.
 
-## `POST /v1/file`
+## `POST /v1/files`
 
 Upload a new file to the server.
 
@@ -138,7 +138,7 @@ The file was successfully uploaded. The body is an object of the following schem
 
 | Attribute | Type | Description |
 |-|-|-|
-| `id` | `str` | The UUID of the newly created file. It can be used to download and delete the file. |
+| `id` | `str` | The UUID of the newly created file. It can be used to download the file. |
 
 ### Response 401 "Unauthorized"
 
@@ -156,7 +156,7 @@ An internal error occurred. The body is an object of the following schema:
 |-|-|-|
 | `message` | `str` | A short description of the problem. |
 
-## `GET /v1/file/<id:str>`
+## `GET /v1/files/<id:str>`
 
 Download the requested file.
 
@@ -207,7 +207,7 @@ The database queries all follow the same scheme: There is a request to get all r
 Access to certain resources may be restricted depending on the resource class and the client's authorization:
 
 * Courses, Folders, and Authors are always retrievable by anyone.
-* A document is retrievable iff the user is logged in and is authorized to retrieve all downloads, or the document is question belongs to a visible item.
+* A document is retrievable iff the user is logged in and is authorized to retrieve all downloads, or the document belongs to a visible item.
 * An item is retrievable iff the user is logged in and is authorized to retrieve all items, or the item is visible.
 
 The creation, modification and deletion of resources is only possible by users that are logged in and are authorized to do so.
@@ -222,7 +222,7 @@ The body is an empty object.
 
 ### Response 200 "Ok"
 
-The query was successful. The body is an object of type `{int:ResourceClass}`, where resource IDs are mapped to resources. Note that the selection of returned resources may be different depending on the class and client's authorization.
+The query was successful. The body is an object of type `{int:ResourceClass}`, where resource IDs are mapped to resources. Resources the user is not authorized to access are not included and therefore, the response may be different depending on the class and client's authorization.
 
 ### Response 500 "Internal Server Error"
 
@@ -254,7 +254,7 @@ The requested resource does not exist. The body is an object of the following sc
 
 ### Response 401 "Unauthorized"
 
-The client lacks authorization to access the resource, usually because the client is not logged in and the resource is invisible. The body is an object of the following schema:
+The client lacks authorization to access the resource. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
@@ -310,7 +310,7 @@ An internal error occurred. The body is an object of the following schema:
 
 ## `PUT /v1/<resource>s/<id:int>`
 
-Set the meta-data of an resource, create it if necessary.
+Update a resource, create it if necessary.
 
 ### Request
 
