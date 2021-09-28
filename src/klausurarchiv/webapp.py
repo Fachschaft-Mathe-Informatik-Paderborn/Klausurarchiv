@@ -2,7 +2,7 @@ import json
 
 from flask import Response, Blueprint
 
-from klausurarchiv.model import *
+from klausurarchiv.db import *
 
 bp = Blueprint("interface-v1", __name__, url_prefix="/v1")
 

@@ -1,5 +1,5 @@
 from flask import Flask
-from klausurarchiv import webapp, model, cli
+from klausurarchiv import webapp, db, cli
 from flask_cors import CORS
 
 
@@ -17,7 +17,7 @@ def create_app(test_config=None):
     else:
         app.config.from_mapping(test_config)
 
-    app.teardown_appcontext(model.Archive.close_singleton)
+    app.teardown_appcontext(db.Archive.close_singleton)
 
     app.register_blueprint(cli.bp)
     app.register_blueprint(webapp.bp)

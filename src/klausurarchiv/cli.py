@@ -6,7 +6,7 @@ import click
 from flask import Blueprint
 from flask.cli import with_appcontext
 
-from klausurarchiv import model
+from klausurarchiv import db
 
 bp = Blueprint("cli", __name__)
 
@@ -15,7 +15,7 @@ bp = Blueprint("cli", __name__)
 @click.command("init-archive")
 @with_appcontext
 def init_archive_command():
-    model.Archive.get_singleton().init_archive()
+    db.Archive.get_singleton().init_archive()
 
 
 @bp.cli.add_command
@@ -30,7 +30,7 @@ def legacy_import(old_archive_path: str):
         print(f"{old_archive_path} is not a valid Klausurarchiv archive!", file=sys.stderr)
         sys.exit(1)
 
-    archive = model.Archive.get_singleton()
+    archive = db.Archive.get_singleton()
 
     author_aliases = dict()
     lectures_aliases_path = database_path / Path("examiners.aliases")
