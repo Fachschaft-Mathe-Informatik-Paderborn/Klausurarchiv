@@ -1,9 +1,7 @@
 import json
 
-from flask import Response, Blueprint, request, session
+from flask import Response, Blueprint, request, session, make_response
 from werkzeug.exceptions import HTTPException, BadRequest, Unauthorized
-from typing import Dict
-from datetime import datetime
 
 from klausurarchiv.db import *
 
@@ -42,7 +40,7 @@ def login():
 
     session["username"] = username
 
-    return json.dumps(dict())
+    return make_response(dict())
 
 
 @bp.post("/logout")
@@ -51,7 +49,7 @@ def logout():
         session.pop("username")
     except KeyError:
         pass
-    return json.dumps(dict())
+    return make_response(dict())
 
 
 @bp.route("/item")
