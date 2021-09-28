@@ -9,18 +9,26 @@ from flask import g, current_app
 class Archive(object):
     def __init__(self, path: Path):
         self.__path: Path = Path(path)
-        if self.db_path.is_file():
-            self.__db: sqlite3.Connection = sqlite3.connect(self.db_path)
+        if self.__db_path.is_file():
+            self.__db: sqlite3.Connection = sqlite3.connect(self.__db_path)
 
     def init_archive(self):
-        if not self.__path.exists():
-            os.makedirs(self.__path)
-        if self.docs_dir.exists():
-            shutil.rmtree(self.docs_dir)
-        os.makedirs(self.docs_dir)
-        self.__db = sqlite3.connect(self.db_path)
+        if self.path.exists():
+            shutil.rmtree(self.path)
+        os.makedirs(self.path)
+
+        # Initialize docs directory
+        os.makedirs(self.__docs_path)
+
+        # Initialize database
+        self.__db = sqlite3.connect(self.__db_path)
         with current_app.open_resource("schema.sql", mode="r") as f:
             self.__db.executescript(f.read())
+
+        # Initialize secret
+        with open(self.__secret_path, mode="wb") as file:
+            file.write(os.urandom(32))
+        self.__secret_path.chmod(0o400)
 
     def commit(self):
         self.__db.commit()
@@ -38,12 +46,21 @@ class Archive(object):
             del archive
 
     @property
-    def db_path(self):
+    def secret_key(self) -> bytes:
+        with open(self.__secret_path, mode="rb") as file:
+            return file.read()
+
+    @property
+    def __db_path(self) -> Path:
         return self.__path / Path("archive.sqlite")
 
     @property
-    def docs_dir(self) -> Path:
+    def __docs_path(self) -> Path:
         return self.__path / Path("docs")
+
+    @property
+    def __secret_path(self) -> Path:
+        return self.__path / Path("SECRET")
 
     @property
     def path(self) -> Path:
