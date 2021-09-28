@@ -8,11 +8,24 @@ from klausurarchiv.db import *
 bp = Blueprint("interface-v1", __name__, url_prefix="/v1")
 
 
-@bp.errorhandler(HTTPException)
-def handle_http_exception(e: HTTPException):
-    return json.dumps({
-        "message": e.description
-    }), e.code
+@bp.errorhandler(Exception)
+def handle_http_exception(e: Exception):
+    if isinstance(e, HTTPException):
+        return Response(
+            response=json.dumps({
+                "message": e.description,
+            }),
+            status=e.code,
+            content_type="application/json"
+        )
+    else:
+        return Response(
+            response=json.dumps({
+                "message": "Internal Server Error",
+            }),
+            status=500,
+            content_type="application/json"
+        )
 
 
 @bp.post("/login")
@@ -24,13 +37,9 @@ def login():
 
     try:
         username = str(data["username"])
-    except KeyError:
-        raise BadRequest("Request must contain username")
-
-    try:
         password = str(data["password"])
     except KeyError:
-        raise BadRequest("Request must contain password")
+        raise BadRequest("Incomplete Request")
 
     # TODO: Implement password checking
     correct = username == "john" and password == "4711"
