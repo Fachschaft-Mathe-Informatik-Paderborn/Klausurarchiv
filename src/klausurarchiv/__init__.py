@@ -22,7 +22,10 @@ def create_app(test_config=None):
         app.config.from_mapping(test_config)
 
     archive = db.Archive(app.config["ARCHIVE_PATH"])
-    app.secret_key = archive.secret_key
+    try:
+        app.secret_key = archive.secret_key
+    except FileNotFoundError:
+        pass
 
     app.teardown_appcontext(db.Archive.close_singleton)
 
