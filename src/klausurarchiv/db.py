@@ -1,19 +1,18 @@
 import datetime
+import importlib.resources as import_res
 import os
-import shutil
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
-from uuid import uuid4, UUID
-import importlib.resources as import_res
+from typing import List, Optional, Dict
 
 from flask import g, current_app
 
 
 class Document(object):
-    def __init__(self, db: sqlite3.Connection, doc_id: int):
+    def __init__(self, db: sqlite3.Connection, doc_id: int, docs_path: Path):
         self.__db = db
         self.__doc_id = doc_id
+        self.__docs_path = docs_path
 
     @property
     def doc_id(self) -> int:
@@ -26,7 +25,16 @@ class Document(object):
 
     @name.setter
     def name(self, new_name: str):
-        cursor = self.__db.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
+        self.__db.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
+
+    @property
+    def content_type(self) -> str:
+        cursor = self.__db.execute("select content_type from Documents where ID=?", (self.__doc_id,))
+        return cursor.fetchone()[0]
+
+    @content_type.setter
+    def content_type(self, new_type: str):
+        self.__db.set_authorizer("update Documents set content_type=? where ID=?", (new_type, self.__doc_id))
 
     @property
     def downloadable(self) -> bool:
@@ -43,8 +51,7 @@ class Document(object):
 
     @property
     def path(self) -> Path:
-        cursor = self.__db.execute("select path from Documents where ID=?", (self.__doc_id,))
-        return Path(cursor.fetchone()[0])
+        return self.__docs_path / Path(str(self.__doc_id))
 
     def __eq__(self, other: 'Document') -> bool:
         return self.__db == other.__db and self.doc_id == other.doc_id
@@ -66,26 +73,22 @@ class Course(object):
         return self.__courses_id
 
     @property
-    def canonical_name(self) -> str:
-        cursor = self.__db.execute("select canonical_name from Courses where ID=?", (self.course_id,))
+    def long_name(self) -> str:
+        cursor = self.__db.execute("select long_name from Courses where ID=?", (self.course_id,))
         return cursor.fetchone()[0]
 
-    @canonical_name.setter
-    def canonical_name(self, new_name):
-        self.__db.execute("update Courses set canonical_name=? where ID=?", (new_name, self.course_id))
+    @long_name.setter
+    def long_name(self, new_name):
+        self.__db.execute("update Courses set long_name=? where ID=?", (new_name, self.course_id))
 
     @property
-    def aliases(self) -> List[str]:
-        return [row[0] for row in
-                self.__db.execute("select `alias` from `CourseAliases` where ID=?", (self.__courses_id,))]
+    def short_name(self) -> str:
+        cursor = self.__db.execute("select short_name from Courses where ID=?", (self.course_id,))
+        return cursor.fetchone()[0]
 
-    def add_alias(self, new_alias: str):
-        self.__db.execute("insert into CourseAliases(ID, alias) values (?, ?)", (self.__courses_id, new_alias))
-
-    def remove_alias(self, alias: str):
-        cursor = self.__db.cursor()
-        cursor.execute("delete from CourseAliases where ID=? and alias=?", (self.__courses_id, alias))
-        cursor.close()
+    @short_name.setter
+    def short_name(self, new_name):
+        self.__db.execute("update Courses set short_name=? where ID=?", (new_name, self.course_id))
 
     def __eq__(self, other: 'Course') -> bool:
         return self.__db == other.__db and self.course_id == other.course_id
@@ -160,11 +163,6 @@ class Item(object):
         self.__docs_dir = docs_dir
 
     @property
-    def uuid(self) -> UUID:
-        cursor = self.__db.execute("select uuid from Items where ID=?", (self.item_id,))
-        return UUID(cursor.fetchone()[0])
-
-    @property
     def item_id(self):
         return self.__item_id
 
@@ -191,26 +189,16 @@ class Item(object):
 
     @property
     def documents(self) -> List[Document]:
-        return [Document(self.__db, int(row[0])) for row in
-                self.__db.execute("select ID from Documents where item=?", (self.__item_id,))]
+        return [Document(self.__db, int(row[0]), self.__docs_dir) for row in
+                self.__db.execute("select DocumentID from ItemDocumentMap where ItemID=?", (self.__item_id,))]
 
-    def add_document(self, original_path: Path) -> Document:
-        target_path = self.__docs_dir / Path(f"{uuid4()}{original_path.suffix}")
-        shutil.copy(original_path, target_path)
-
-        cursor = self.__db.execute("insert into Documents(name, path, item) values (?, ?, ?)",
-                                   (original_path.name, str(target_path), self.__item_id))
-        return Document(self.__db, cursor.lastrowid)
+    def add_document(self, document: Document):
+        self.__db.execute("insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
+                          (self.item_id, document.doc_id))
 
     def remove_document(self, document: Document):
-        self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
-
-    def get_document_with_name(self, name: str) -> Optional[Document]:
-        cursor = self.__db.execute("select ID from Documents where name=?", (name,))
-        document = cursor.fetchone()
-        if document is not None:
-            document = Document(self.__db, document[0])
-        return document
+        self.__db.execute("delete from ItemDocumentMap where ItemID=? and DocumentID=?",
+                          (self.item_id, document.doc_id))
 
     @property
     def applicable_courses(self) -> List[Course]:
@@ -235,19 +223,15 @@ class Item(object):
         self.__db.execute("delete from ItemAuthorMap where ItemID=? and AuthorID=?", (self.item_id, author.author_id))
 
     @property
-    def folder(self) -> Optional[Folder]:
-        cursor = self.__db.execute("select folderID from Items where ID=?", (self.item_id,))
-        folder = cursor.fetchone()[0]
-        if folder is not None:
-            folder = Folder(folder, self.__db)
-        return folder
+    def folder(self) -> List[Folder]:
+        return [Folder(folder_id, self.__db) for folder_id in
+                self.__db.execute("select FolderID from ItemFolderMap where ItemID=?", (self.item_id,))]
 
-    @folder.setter
-    def folder(self, folder: Optional[Folder]):
-        if folder is None:
-            self.__db.execute("update Items set folderID=NULL where ID=?", (self.item_id,))
-        else:
-            self.__db.execute("update Items set folderID=? where ID=?", (folder.folder_id, self.item_id))
+    def add_folder(self, folder: Folder):
+        self.__db.execute("insert into ItemFolderMap(ItemID, FolderID) values (?, ?)", (self.item_id, folder.folder_id))
+
+    def remove_folder(self, folder: Folder):
+        self.__db.execute("delete from ItemFolderMap where ItemID=? and FolderID=?", (self.item_id, folder.folder_id))
 
     def __eq__(self, other: 'Item') -> bool:
         return self.__db == other.__db and self.item_id == other.item_id
@@ -266,22 +250,22 @@ class Archive(object):
             os.makedirs(path)
 
         # Check Docs Dir
-        if not self.__docs_path.exists():
-            os.makedirs(self.__docs_path)
+        if not self.docs_path.exists():
+            os.makedirs(self.docs_path)
 
         # Check database
-        database_exists = self.__db_path.exists()
-        self.__db: sqlite3.Connection = sqlite3.connect(self.__db_path)
+        database_exists = self.db_path.exists()
+        self.__db: sqlite3.Connection = sqlite3.connect(self.db_path)
         if not database_exists:
             import klausurarchiv
             with import_res.open_text(klausurarchiv, "schema.sql") as f:
                 self.__db.executescript(f.read())
 
         # Check secret
-        if not self.__secret_path.exists():
-            with open(self.__secret_path, mode="wb") as file:
+        if not self.secret_path.exists():
+            with open(self.secret_path, mode="wb") as file:
                 file.write(os.urandom(32))
-            self.__secret_path.chmod(0o400)
+            self.secret_path.chmod(0o400)
 
     def commit(self):
         self.__db.commit()
@@ -300,19 +284,19 @@ class Archive(object):
 
     @property
     def secret_key(self) -> bytes:
-        with open(self.__secret_path, mode="rb") as file:
+        with open(self.secret_path, mode="rb") as file:
             return file.read()
 
     @property
-    def __db_path(self) -> Path:
+    def db_path(self) -> Path:
         return self.__path / Path("archive.sqlite")
 
     @property
-    def __docs_path(self) -> Path:
+    def docs_path(self) -> Path:
         return self.__path / Path("docs")
 
     @property
-    def __secret_path(self) -> Path:
+    def secret_path(self) -> Path:
         return self.__path / Path("SECRET")
 
     @property
@@ -321,23 +305,59 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        return [Item(item_id[0], self.__db, self.__docs_path) for item_id in self.__db.execute("select ID from Items")]
+        return [Item(item_id[0], self.__db, self.docs_path) for item_id in self.__db.execute("select ID from Items")]
 
-    def add_item(self, name: str) -> Item:
-        cursor = self.__db.execute('insert into Items(name, uuid) values (?, ?)', (name, str(uuid4())))
-        return Item(int(cursor.lastrowid), self.__db, self.__docs_path)
+    def add_item(self, attributes: Dict) -> Item:
+        cursor = self.__db.execute(
+            "insert into Items(name, date, visible) values (?, ?, ?)",
+            (attributes["name"], attributes["date"], attributes["visible"])
+        )
+        item = Item(cursor.lastrowid, self.__db, self.docs_path)
+        self.__db.executemany(
+            "insert into ItemDocumentMap values (?, ?)",
+            ((item.item_id, doc_id) for doc_id in attributes["documents"])
+        )
+        self.__db.executemany(
+            "insert into ItemAuthorMap values (?, ?)",
+            ((item.item_id, author_id) for author_id in attributes["authors"])
+        )
+        self.__db.executemany(
+            "insert into ItemCourseMap values (?, ?)",
+            ((item.item_id, course_id) for course_id in attributes["courses"])
+        )
+        self.__db.executemany(
+            "insert into ItemFolderMap values (?, ?)",
+            ((item.item_id, folder_id) for folder_id in attributes["folders"])
+        )
+        return item
 
     def remove_item(self, item: Item):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
     @property
+    def documents(self) -> List[Document]:
+        return [Document(self.__db, row[0], self.docs_path) for row in self.__db.execute("select ID from Documents")]
+
+    def add_document(self, attributes: Dict) -> Document:
+        cursor = self.__db.execute(
+            "insert into Documents(name, downloadable, content_type) values (?, ?, ?)",
+            (attributes["name"], attributes["downloadable"], attributes["content_type"])
+        )
+        return Document(self.__db, cursor.lastrowid, self.docs_path)
+
+    def remove_document(self, document: Document):
+        self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
+
+    @property
     def courses(self) -> List[Course]:
         return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
 
-    def add_course(self, canonical_name: str) -> Course:
-        cursor = self.__db.execute("insert into Courses(canonical_name) values (?)", (canonical_name,))
-        course = Course(cursor.lastrowid, self.__db)
-        return course
+    def add_course(self, attributes: Dict) -> Course:
+        cursor = self.__db.execute(
+            "insert into Courses(long_name, short_name) values (?, ?)",
+            (attributes["long_name"], attributes["short_name"])
+        )
+        return Course(cursor.lastrowid, self.__db)
 
     def remove_course(self, course: Course):
         self.__db.execute("delete from Courses where ID=?", (course.course_id,))
@@ -346,8 +366,11 @@ class Archive(object):
     def folders(self) -> List[Folder]:
         return [Folder(row[0], self.__db) for row in self.__db.execute("select ID from Folders")]
 
-    def add_folder(self, name: str) -> Folder:
-        cursor = self.__db.execute("insert into Folders(name) values (?)", (name,))
+    def add_folder(self, attributes: Dict) -> Folder:
+        cursor = self.__db.execute(
+            "insert into Folders(name) values (?)",
+            (attributes["name"],)
+        )
         return Folder(cursor.lastrowid, self.__db)
 
     def remove_folder(self, folder: Folder):
@@ -357,8 +380,11 @@ class Archive(object):
     def authors(self) -> List[Author]:
         return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
 
-    def add_author(self, name: str) -> Author:
-        cursor = self.__db.execute("insert into Authors(name) values (?)", (name,))
+    def add_author(self, attributes: Dict) -> Author:
+        cursor = self.__db.execute(
+            "insert into Authors(name) values (?)",
+            (attributes["name"],)
+        )
         return Author(cursor.lastrowid, self.__db)
 
     def remove_author(self, author: Author):
