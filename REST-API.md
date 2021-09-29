@@ -2,23 +2,23 @@
 
 ## Item
 
-| Attribute     | Type      | Default   | Description                                               |
-|---------------|-----------|-----------|-----------------------------------------------------------|
-| `name`        | `str`     | `null`    | Display name of the item                                  |
-| `date`        | `str`     | `null`    | Associated date of the item, in iso format: YYYY-MM-DD    |
-| `documents`   | `[int]`   | `[]`      | List of associated document IDs.                          |
-| `authors`     | `[int]`   | `[]`      | List of associated author IDs.                            |
-| `courses`     | `[int]`   | `[]`      | List of associated course IDs.                            |
-| `folders`     | `[int]`   | `[]`      | List of associated folder IDs.                            |
-| `visible`     | `bool`    | `false`   | True iff the item is visible to unauthorized users.       |
+| Attribute     | Type      | Description                                               |
+|---------------|-----------|-----------------------------------------------------------|
+| `name`        | `str`     | Display name of the item                                  |
+| `date`        | `str`     | Associated date of the item, in iso format: YYYY-MM-DD    |
+| `documents`   | `[int]`   | List of associated document IDs.                          |
+| `authors`     | `[int]`   | List of associated author IDs.                            |
+| `courses`     | `[int]`   | List of associated course IDs.                            |
+| `folders`     | `[int]`   | List of associated folder IDs.                            |
+| `visible`     | `bool`    | True iff the item is visible to unauthorized users.       |
 
 ## Document
 
-| Attribute         | Type      | Default       | Description                                                   |
-|-------------------|-----------|---------------|---------------------------------------------------------------|
-| `filename`        | `str`     | `null`        | Filename of the document.                                     |
-| `downloadable`    | `bool`    | `false`       | True iff the document is downloadable by unauthorized users.  |
-| `content-type`    | `str`     | `text/plain`  | The [media type](https://en.wikipedia.org/wiki/Media_type) of the document. |
+| Attribute         | Type      | Description                                                   |
+|-------------------|-----------|---------------------------------------------------------------|
+| `filename`        | `str`     | Filename of the document.                                     |
+| `downloadable`    | `bool`    | True iff the document is downloadable by unauthorized users.  |
+| `content-type`    | `str`     | The [media type](https://en.wikipedia.org/wiki/Media_type) of the document. |
 
 Only the following content types are allowed:
 
@@ -32,22 +32,22 @@ Only the following content types are allowed:
 
 ## Course
 
-| Attribute     | Type  | Default   | Description                                               |
-|---------------|-------|-----------|-----------------------------------------------------------|
-| `long_name`   | `str` | `null`    | The long name of the course, i.e. "Rocket Programming"    |
-| `short_name`  | `str` | `null`    | The short, abbreviated name of the course, i.e. "RS"      |
+| Attribute     | Type  | Description                                               |
+|---------------|-------|-----------------------------------------------------------|
+| `long_name`   | `str` | The long name of the course, i.e. "Rocket Programming"    |
+| `short_name`  | `str` | The short, abbreviated name of the course, i.e. "RS"      |
 
 ## Folder
 
-| Attribute     | Type  | Default   | Description                                           |
-|---------------|-------|-----------|-------------------------------------------------------|
-| `name`        | `str` | `null`    | Display name of the folder as printed on the label.   |
+| Attribute     | Type  | Description                                           |
+|---------------|-------|-------------------------------------------------------|
+| `name`        | `str` | Display name of the folder as printed on the label.   |
 
 ## Author
 
-| Attribute     | Type  | Default   | Description               |
-|---------------|-------|-----------|---------------------------|
-| `name`        | `str` | `null`    | Full name of the author.  |
+| Attribute     | Type  | Description               |
+|---------------|-------|---------------------------|
+| `name`        | `str` | Full name of the author.  |
 
 # Login and Authorization
 
