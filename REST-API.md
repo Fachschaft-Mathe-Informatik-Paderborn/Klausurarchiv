@@ -2,42 +2,52 @@
 
 ## Item
 
-| Attribute     | Type      | Description                                               |
-|---------------|-----------|-----------------------------------------------------------|
-| `name`        | `str`     | Display name of the item                                  |
-| `date`        | `str`     | Associated date of the item, in iso format: YYYY-MM-DD    |
-| `documents`   | `[int]`   | List of associated document IDs.                          |
-| `authors`     | `[int]`   | List of associated author IDs.                            |
-| `courses`     | `[int]`   | List of associated course IDs.                            |
-| `folders`     | `[int]`   | List of associated folder IDs.                            |
-| `visible`     | `bool`    | True iff the item is visible to unauthorized users.       |
+| Attribute     | Type      | Default   | Description                                               |
+|---------------|-----------|-----------|-----------------------------------------------------------|
+| `name`        | `str`     | `null`    | Display name of the item                                  |
+| `date`        | `str`     | `null`    | Associated date of the item, in iso format: YYYY-MM-DD    |
+| `documents`   | `[int]`   | `[]`      | List of associated document IDs.                          |
+| `authors`     | `[int]`   | `[]`      | List of associated author IDs.                            |
+| `courses`     | `[int]`   | `[]`      | List of associated course IDs.                            |
+| `folders`     | `[int]`   | `[]`      | List of associated folder IDs.                            |
+| `visible`     | `bool`    | `false`   | True iff the item is visible to unauthorized users.       |
 
 ## Document
 
-| Attribute         | Type      | Description                                                           |
-|-------------------|-----------|-----------------------------------------------------------------------|
-| `name`            | `str`     | Display name of the document.                                         |
-| `downloadable`    | `bool`    | True iff the document is downloadable by unauthorized users.          |
-| `file_id`         | `str`     | UUID of the document's file, used by the `/v1/files/` endpoint.       |
+| Attribute         | Type      | Default       | Description                                                   |
+|-------------------|-----------|---------------|---------------------------------------------------------------|
+| `filename`        | `str`     | `null`        | Filename of the document.                                     |
+| `downloadable`    | `bool`    | `false`       | True iff the document is downloadable by unauthorized users.  |
+| `content-type`    | `str`     | `text/plain`  | The [media type](https://en.wikipedia.org/wiki/Media_type) of the document. |
+
+Only the following content types are allowed:
+
+* `application/msword`
+* `application/pdf`
+* `application/x-latex`
+* `image/png`
+* `image/jpeg`
+* `image/gif`
+* `text/plain`
 
 ## Course
 
-| Attribute     | Type  | Description                                               |
-|---------------|-------|-----------------------------------------------------------|
-| `long_name`   | `str` | The long name of the course, i.e. "Rocket Programming"    |
-| `short_name`  | `str` | The short, abbreviated name of the course, i.e. "RS"      |
+| Attribute     | Type  | Default   | Description                                               |
+|---------------|-------|-----------|-----------------------------------------------------------|
+| `long_name`   | `str` | `null`    | The long name of the course, i.e. "Rocket Programming"    |
+| `short_name`  | `str` | `null`    | The short, abbreviated name of the course, i.e. "RS"      |
 
 ## Folder
 
-| Attribute     | Type  | Description                                           |
-|---------------|-------|-------------------------------------------------------|
-| `name`        | `str` | Display name of the folder as printed on the label.   |
+| Attribute     | Type  | Default   | Description                                           |
+|---------------|-------|-----------|-------------------------------------------------------|
+| `name`        | `str` | `null`    | Display name of the folder as printed on the label.   |
 
 ## Author
 
-| Attribute     | Type  | Description               |
-|---------------|-------|---------------------------|
-| `name`        | `str` | Full name of the author.  |
+| Attribute     | Type  | Default   | Description               |
+|---------------|-------|-----------|---------------------------|
+| `name`        | `str` | `null`    | Full name of the author.  |
 
 # Login and Authorization
 
@@ -99,94 +109,6 @@ The logout was successful and the session information is removed from the `KLAUS
 ### Response 500 "Internal Server Error"
 
 An internal error occurred. The body is an empty object. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-# File up- and downloads
-
-While documents represent the files in the database, they only contain metadata information about them. The actual files are up- and downloaded at separate endpoints. Downloading files is possible iff the user is logged in and is authorized to download all files, or the file belongs to a downloadable document of a visible item. Uploading files is only possible by authorized users.
-
-It is not possible to delete files. Orphaned files will be automatically deleted during housekeeping.
-
-## `POST /v1/files`
-
-Upload a new file to the server.
-
-### Request
-
-The body of an upload request is exactly the file content and it takes the following header parameters:
-
-| Header | Description |
-|-|-|
-| `Content-Type` | The [media type](https://en.wikipedia.org/wiki/Media_type) of the file. |
-
-Only the following content types are allowed:
-
-* `application/msword`
-* `application/pdf`
-* `application/x-latex`
-* `image/png`
-* `image/jpeg`
-* `image/gif`
-* `text/plain`
-
-### Response 201 "Created"
-
-The file was successfully uploaded. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `id` | `str` | The UUID of the newly created file. It can be used to download the file. |
-
-### Response 401 "Unauthorized"
-
-The client lacks authorization to upload the file. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-## `GET /v1/files/<id:str>`
-
-Download the requested file.
-
-### Request
-
-The request may be empty.
-
-### Response 200 "Ok"
-
-The body of the response is the content of the requested file. The `Content-Type` header will be set the content type of the file.
-
-### Response 401 "Unauthorized"
-
-The client lacks the authorization to download the file.
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 404 "Not Found"
-
-The requested file does not exist. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
@@ -371,6 +293,87 @@ The requested resource does not exist. The body is an object of the following sc
 ### Response 401 "Unauthorized"
 
 The client lacks authorization to delete the resource, usually because the client is not logged in and the resource is invisible. The body is an object of the following schema:
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+### Response 500 "Internal Server Error"
+
+An internal error occurred. The body is an object of the following schema:
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+# Document content up- and downloads
+
+While documents are represented as the `/v1/documents` resource, it only provides metadata information. The actual contents are up- and downloaded at separate endpoints. Downloading documents is possible iff the user is logged in and is authorized to download all documents, or the document belongs to a downloadable document of a visible item. Uploading documents is only possible by authorized users.
+
+## `POST /v1/upload`
+
+Upload a document's content to the server.
+
+### Request
+
+| Query Parameter | Type | Description |
+|-|-|-|
+| `id` | `int` | The ID of the document to upload. If the document doesn't exist, it is created. |
+
+The body of an upload request is exactly the document's content.
+
+### Response 200 "Ok"
+
+The file was successfully uploaded. The body is empty.
+
+### Response 401 "Unauthorized"
+
+The client lacks authorization to upload the document. The body is an object of the following schema:
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+### Response 500 "Internal Server Error"
+
+An internal error occurred. The body is an object of the following schema:
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+## `GET /v1/download`
+
+Download the requested document.
+
+### Request
+
+| Query Parameter | Type | Description |
+|-|-|-|
+| `id` | `int` | The ID of the document to download. |
+
+The body may be empty.
+
+### Response 200 "Ok"
+
+The body of the response is the content of the requested document. The following headers will be set:
+
+| Header | Description |
+|-|-|
+| `Content-Type` | The content type of the document. |
+| `Content-Disposition` | Set to `attachment`, with the filename. |
+
+### Response 401 "Unauthorized"
+
+The client lacks the authorization to download the document.
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+### Response 404 "Not Found"
+
+The requested document does not exist. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
