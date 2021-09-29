@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4, UUID
+import importlib.resources as import_res
 
 from flask import g, current_app
 
@@ -261,26 +262,26 @@ class Item(object):
 class Archive(object):
     def __init__(self, path: Path):
         self.__path: Path = Path(path)
-        if self.__db_path.is_file():
-            self.__db: sqlite3.Connection = sqlite3.connect(self.__db_path)
+        if not self.__path.exists():
+            os.makedirs(path)
 
-    def init_archive(self):
-        if self.path.exists():
-            shutil.rmtree(self.path)
-        os.makedirs(self.path)
+        # Check Docs Dir
+        if not self.__docs_path.exists():
+            os.makedirs(self.__docs_path)
 
-        # Initialize docs directory
-        os.makedirs(self.__docs_path)
+        # Check database
+        database_exists = self.__db_path.exists()
+        self.__db: sqlite3.Connection = sqlite3.connect(self.__db_path)
+        if not database_exists:
+            import klausurarchiv
+            with import_res.open_text(klausurarchiv, "schema.sql") as f:
+                self.__db.executescript(f.read())
 
-        # Initialize database
-        self.__db = sqlite3.connect(self.__db_path)
-        with current_app.open_resource("schema.sql", mode="r") as f:
-            self.__db.executescript(f.read())
-
-        # Initialize secret
-        with open(self.__secret_path, mode="wb") as file:
-            file.write(os.urandom(32))
-        self.__secret_path.chmod(0o400)
+        # Check secret
+        if not self.__secret_path.exists():
+            with open(self.__secret_path, mode="wb") as file:
+                file.write(os.urandom(32))
+            self.__secret_path.chmod(0o400)
 
     def commit(self):
         self.__db.commit()
@@ -320,11 +321,11 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        return [Item(item_id[0], self.__db, self.docs_dir) for item_id in self.__db.execute("select ID from Items")]
+        return [Item(item_id[0], self.__db, self.__docs_path) for item_id in self.__db.execute("select ID from Items")]
 
     def add_item(self, name: str) -> Item:
         cursor = self.__db.execute('insert into Items(name, uuid) values (?, ?)', (name, str(uuid4())))
-        return Item(int(cursor.lastrowid), self.__db, self.docs_dir)
+        return Item(int(cursor.lastrowid), self.__db, self.__docs_path)
 
     def remove_item(self, item: Item):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))

@@ -2,7 +2,7 @@ import json
 
 import werkzeug.exceptions
 from flask import Flask
-from klausurarchiv import webapp, db, cli
+from klausurarchiv import webapp, db
 from flask_cors import CORS
 
 
@@ -28,8 +28,6 @@ def create_app(test_config=None):
         pass
 
     app.teardown_appcontext(db.Archive.close_singleton)
-
-    app.register_blueprint(cli.bp)
     app.register_blueprint(webapp.bp)
 
     return app

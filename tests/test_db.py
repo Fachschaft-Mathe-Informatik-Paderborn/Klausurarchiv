@@ -7,7 +7,6 @@ class TestDocument(object):
     def test_document(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             item = archive.add_item("itemA")
 
             doc_a_path = Path(tempdir) / Path("doc_a.txt")
@@ -31,7 +30,6 @@ class TestCourse(object):
     def test_canonical_name(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             course = archive.add_course("Rocket Science")
             assert course.canonical_name == "Rocket Science"
 
@@ -41,7 +39,6 @@ class TestCourse(object):
     def test_aliases(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             course = archive.add_course("Rocket Science")
             assert course.aliases == []
 
@@ -61,7 +58,6 @@ class TestFolder(object):
     def test_name(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             folder = archive.add_folder("Rocket Science")
             assert folder.name == "Rocket Science"
 
@@ -73,7 +69,6 @@ class TestAuthor(object):
     def test_name(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             author = archive.add_author("Dr. Jane Doe")
             assert author.name == "Dr. Jane Doe"
 
@@ -85,7 +80,6 @@ class TestItem(object):
     def test_meta(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             item = archive.add_item("Rocket Science")
             folder = archive.add_folder("Rocket Science")
             author = archive.add_author("Prof. Dr. Jane Doe")
@@ -117,7 +111,6 @@ class TestItem(object):
     def test_uuid(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             item_a = archive.add_item("Item A")
             item_b = archive.add_item("Item B")
             assert item_a.uuid != item_b.uuid
@@ -132,7 +125,6 @@ class TestItem(object):
                 file.write("Foo Bar\n")
 
             archive = Archive(tempdir)
-            archive.init_archive()
             item = archive.add_item("item")
             assert item.documents == []
 
@@ -157,7 +149,6 @@ class TestItem(object):
     def test_courses(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             course1 = archive.add_course("Rocket Science")
             course2 = archive.add_course("Foundations of Rocket Science")
 
@@ -177,7 +168,6 @@ class TestArchive(object):
     def test_items(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
             assert str(archive.path) == tempdir
             assert len(archive.items) == 0
 
@@ -197,7 +187,6 @@ class TestArchive(object):
     def test_reopen(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive_a = Archive(tempdir)
-            archive_a.init_archive()
             archive_a.add_item("item")
             archive_a.commit()
             del archive_a
@@ -208,7 +197,6 @@ class TestArchive(object):
     def test_courses(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
 
             assert archive.courses == []
             course1 = archive.add_course("Rocket Science")
@@ -223,7 +211,6 @@ class TestArchive(object):
     def test_folders(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
 
             assert archive.folders == []
             folder1 = archive.add_folder("Rocket Science")
@@ -238,7 +225,6 @@ class TestArchive(object):
     def test_authors(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            archive.init_archive()
 
             assert archive.authors == []
             author1 = archive.add_author("Dr. Max Mustermann")
