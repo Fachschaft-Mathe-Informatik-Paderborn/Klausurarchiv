@@ -355,6 +355,9 @@ class Archive(object):
     def remove_item(self, item: Item):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
+    def get_item(self, item_id: int) -> Item:
+        return Item(item_id, self.__db, self.docs_path)
+
     @property
     def documents(self) -> List[Document]:
         return [Document(self.__db, row[0], self.docs_path) for row in self.__db.execute("select ID from Documents")]
@@ -372,6 +375,9 @@ class Archive(object):
     def remove_document(self, document: Document):
         self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
 
+    def get_document(self, document_id: int) -> Document:
+        return Document(self.__db, document_id, self.docs_path)
+
     @property
     def courses(self) -> List[Course]:
         return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
@@ -385,6 +391,9 @@ class Archive(object):
 
     def remove_course(self, course: Course):
         self.__db.execute("delete from Courses where ID=?", (course.course_id,))
+
+    def get_course(self, course_id: int) -> Course:
+        return Course(course_id, self.__db)
 
     @property
     def folders(self) -> List[Folder]:
@@ -400,6 +409,9 @@ class Archive(object):
     def remove_folder(self, folder: Folder):
         self.__db.execute("delete from Folders where ID=?", (folder.folder_id,))
 
+    def get_folder(self, folder_id: int) -> Folder:
+        return Folder(folder_id, self.__db)
+
     @property
     def authors(self) -> List[Author]:
         return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
@@ -413,6 +425,9 @@ class Archive(object):
 
     def remove_author(self, author: Author):
         self.__db.execute("delete from Authors where ID=?", (author.author_id,))
+
+    def get_author(self, author_id: int) -> Author:
+        return Author(author_id, self.__db)
 
     def __eq__(self, other: 'Archive') -> bool:
         return self.path == other.path
