@@ -19,13 +19,13 @@ class Document(object):
         return self.__doc_id
 
     @property
-    def name(self) -> str:
-        cursor = self.__db.execute("select name from Documents where ID=?", (self.__doc_id,))
+    def filename(self) -> str:
+        cursor = self.__db.execute("select filename from Documents where ID=?", (self.__doc_id,))
         return cursor.fetchone()[0]
 
-    @name.setter
-    def name(self, new_name: str):
-        self.__db.execute("update Documents set name=? where ID=?", (new_name, self.__doc_id))
+    @filename.setter
+    def filename(self, new_name: str):
+        self.__db.execute("update Documents set filename=? where ID=?", (new_name, self.__doc_id))
 
     @property
     def content_type(self) -> str:
@@ -34,7 +34,7 @@ class Document(object):
 
     @content_type.setter
     def content_type(self, new_type: str):
-        self.__db.set_authorizer("update Documents set content_type=? where ID=?", (new_type, self.__doc_id))
+        self.__db.execute("update Documents set content_type=? where ID=?", (new_type, self.__doc_id))
 
     @property
     def downloadable(self) -> bool:
@@ -119,7 +119,8 @@ class Folder(object):
         self.__db.execute("update Folders set name=? where ID=?", (new_name, self.folder_id))
 
     def __eq__(self, other: 'Folder'):
-        return self.__db == other.__db and self.folder_id == other.folder_id
+        is_equal = self.__db == other.__db and self.folder_id == other.folder_id
+        return is_equal
 
     def __ne__(self, other: 'Folder'):
         return not self == other
@@ -223,8 +224,8 @@ class Item(object):
         self.__db.execute("delete from ItemAuthorMap where ItemID=? and AuthorID=?", (self.item_id, author.author_id))
 
     @property
-    def folder(self) -> List[Folder]:
-        return [Folder(folder_id, self.__db) for folder_id in
+    def folders(self) -> List[Folder]:
+        return [Folder(row[0], self.__db) for row in
                 self.__db.execute("select FolderID from ItemFolderMap where ItemID=?", (self.item_id,))]
 
     def add_folder(self, folder: Folder):
@@ -340,8 +341,8 @@ class Archive(object):
 
     def add_document(self, attributes: Dict) -> Document:
         cursor = self.__db.execute(
-            "insert into Documents(name, downloadable, content_type) values (?, ?, ?)",
-            (attributes["name"], attributes["downloadable"], attributes["content_type"])
+            "insert into Documents(filename, downloadable, content_type) values (?, ?, ?)",
+            (attributes["filename"], attributes["downloadable"], attributes["content-type"])
         )
         return Document(self.__db, cursor.lastrowid, self.docs_path)
 

@@ -1,9 +1,7 @@
-import json
-
-import werkzeug.exceptions
 from flask import Flask
-from klausurarchiv import webapp, db
 from flask_cors import CORS
+
+from klausurarchiv import webapp, db
 
 
 def create_app(test_config=None):

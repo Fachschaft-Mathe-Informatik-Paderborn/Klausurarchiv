@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS "Courses" (
 DROP TABLE IF EXISTS "Documents";
 CREATE TABLE IF NOT EXISTS "Documents" (
 	"ID"	INTEGER NOT NULL,
-	"name"	TEXT NOT NULL,
-	"file_id"	TEXT NOT NULL,
+	"filename"	TEXT NOT NULL,
+	"content_type"  TEXT NOT NULL,
 	"downloadable"	INTEGER NOT NULL DEFAULT false,
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );

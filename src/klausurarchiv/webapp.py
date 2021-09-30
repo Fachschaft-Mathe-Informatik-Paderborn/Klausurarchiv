@@ -57,13 +57,13 @@ def get_all_items():
     archive = Archive.get_singleton()
     response = Response(
         response=json.dumps(
-            [{"name": item.name,
+            [{"name": item.filename,
               "uuid": item.uuid,
               "date": item.date,
-              "author": item.author.name if item.author is not None else None,
+              "author": item.author.filename if item.author is not None else None,
               "downloadable": item.downloadable,
-              "folder": item.folder.name if item.folder is not None else None,
-              "documents": [doc.name for doc in item.documents]} for item in archive.items
+              "folder": item.folder.filename if item.folder is not None else None,
+              "documents": [doc.filename for doc in item.documents]} for item in archive.items
              ],
             default=str),
         status=200,
