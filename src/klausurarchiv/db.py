@@ -234,6 +234,15 @@ class Item(object):
     def remove_folder(self, folder: Folder):
         self.__db.execute("delete from ItemFolderMap where ItemID=? and FolderID=?", (self.item_id, folder.folder_id))
 
+    @property
+    def visible(self) -> bool:
+        cursor = self.__db.execute("select visible from Items where ID=?", (self.item_id,))
+        return cursor.fetchone()[0] == 1
+
+    @visible.setter
+    def visible(self, new_visible: bool):
+        self.__db.execute("update Items set visible=? where ID=?", (new_visible, self.item_id))
+
     def __eq__(self, other: 'Item') -> bool:
         return self.__db == other.__db and self.item_id == other.item_id
 

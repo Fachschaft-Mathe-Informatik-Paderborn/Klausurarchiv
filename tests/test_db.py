@@ -139,6 +139,7 @@ class TestItem(object):
             assert item.authors == []
             assert item.applicable_courses == []
             assert item.folders == []
+            assert not item.visible
 
             item.name = "Rocket Science WS 2021/22"
             item.date = datetime.date(2021, 12, 3)
