@@ -11,11 +11,11 @@ class TestDocument(object):
 
             assert archive.documents == []
 
-            doc = archive.add_document({
-                "filename": "doc_a.txt",
-                "downloadable": True,
-                "content-type": "text/plain"
-            })
+            doc = archive.add_document(
+                filename="doc_a.txt",
+                downloadable=True,
+                content_type="text/plain"
+            )
 
             with open(doc.path, mode="w") as f:
                 f.write("Hello World\n")
@@ -46,10 +46,10 @@ class TestCourse(object):
     def test_course(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            course = archive.add_course({
-                "long_name": "Rocket Science",
-                "short_name": "RS"
-            })
+            course = archive.add_course(
+                long_name="Rocket Science",
+                short_name="RS"
+            )
 
             assert course.long_name == "Rocket Science"
             assert course.short_name == "RS"
@@ -65,9 +65,9 @@ class TestFolder(object):
     def test_name(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            folder = archive.add_folder({
-                "name": "Rocket Science"
-            })
+            folder = archive.add_folder(
+                name="Rocket Science"
+            )
 
             assert folder.name == "Rocket Science"
 
@@ -79,9 +79,9 @@ class TestAuthor(object):
     def test_name(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            author = archive.add_author({
-                "name": "Dr. Jane Doe"
-            })
+            author = archive.add_author(
+                name="Dr. Jane Doe"
+            )
             assert author.name == "Dr. Jane Doe"
 
             author.name = "Prof. Dr. Jane Doe"
@@ -92,46 +92,46 @@ class TestItem(object):
     def test_item(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
-            doc_a = archive.add_document({
-                "filename": "exam.pdf",
-                "downloadable": True,
-                "content-type": "application/pdf"
-            })
-            doc_b = archive.add_document({
-                "filename": "solution.pdf",
-                "downloadable": True,
-                "content-type": "application/pdf"
-            })
-            folder_a = archive.add_folder({
-                "name": "Rocket Science"
-            })
-            folder_b = archive.add_folder({
-                "name": "Foundations of Rocket Science"
-            })
-            author_a = archive.add_author({
-                "name": "Prof. Dr. Jane Doe"
-            })
-            author_b = archive.add_author({
-                "name": "Prof. Dr. Max Mustermann"
-            })
-            course_a = archive.add_course({
-                "long_name": "Rocket Science",
-                "short_name": "RS"
-            })
-            course_b = archive.add_course({
-                "long_name": "Foundations of Rocket Science",
-                "short_name": "FRS"
-            })
+            doc_a = archive.add_document(
+                filename="exam.pdf",
+                downloadable=True,
+                content_type="application/pdf"
+            )
+            doc_b = archive.add_document(
+                filename="solution.pdf",
+                downloadable=True,
+                content_type="application/pdf"
+            )
+            folder_a = archive.add_folder(
+                name="Rocket Science"
+            )
+            folder_b = archive.add_folder(
+                name="Foundations of Rocket Science"
+            )
+            author_a = archive.add_author(
+                name="Prof. Dr. Jane Doe"
+            )
+            author_b = archive.add_author(
+                name="Prof. Dr. Max Mustermann"
+            )
+            course_a = archive.add_course(
+                long_name="Rocket Science",
+                short_name="RS"
+            )
+            course_b = archive.add_course(
+                long_name="Foundations of Rocket Science",
+                short_name="FRS"
+            )
 
-            item = archive.add_item({
-                "name": "Rocket Science WS 2020/21",
-                "date": None,
-                "documents": [],
-                "authors": [],
-                "courses": [],
-                "folders": [],
-                "visible": False
-            })
+            item = archive.add_item(
+                name="Rocket Science WS 2020/21",
+                date=None,
+                documents=[],
+                authors=[],
+                courses=[],
+                folders=[],
+                visible=False
+            )
 
             assert item.name == "Rocket Science WS 2020/21"
             assert item.date is None
@@ -202,25 +202,6 @@ class TestArchive(object):
             assert archive.secret_path.is_file()
             assert archive.secret_path.parent == archive_dir
 
-    def test_items(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            archive = Archive(tempdir)
-            assert str(archive.path) == tempdir
-            assert len(archive.items) == 0
-
-            item_a = archive.add_item("item_a")
-            assert archive.items == [item_a]
-
-            item_b = archive.add_item("item_b")
-            assert item_a != item_b
-            assert set(archive.items) == {item_a, item_b}
-
-            archive.remove_item(item_a)
-            assert archive.items == [item_b]
-
-            archive.remove_item(item_b)
-            assert archive.items == []
-
     def test_reopen(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive_a = Archive(tempdir)
@@ -231,15 +212,35 @@ class TestArchive(object):
             archive_b = Archive(tempdir)
             assert len(archive_b.items) == 1
 
+    def test_items(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            archive = Archive(tempdir)
+            assert str(archive.path) == tempdir
+            assert len(archive.items) == 0
+
+            item_a = archive.add_item()
+            assert archive.items == [item_a]
+
+            item_b = archive.add_item()
+            assert item_a != item_b
+            assert set(archive.items) == {item_a, item_b}
+
+            archive.remove_item(item_a)
+            assert archive.items == [item_b]
+
+            archive.remove_item(item_b)
+            assert archive.items == []
+
     def test_courses(self):
         with tempfile.TemporaryDirectory() as tempdir:
             archive = Archive(tempdir)
 
             assert archive.courses == []
-            course1 = archive.add_course("Rocket Science")
+            course1 = archive.add_course()
             assert archive.courses == [course1]
-            course2 = archive.add_course("Foundations of Rocket Science")
+            course2 = archive.add_course()
             assert set(archive.courses) == {course1, course2}
+            assert course1 != course2
             archive.remove_course(course1)
             assert archive.courses == [course2]
             archive.remove_course(course2)
@@ -250,10 +251,11 @@ class TestArchive(object):
             archive = Archive(tempdir)
 
             assert archive.folders == []
-            folder1 = archive.add_folder("Rocket Science")
+            folder1 = archive.add_folder()
             assert archive.folders == [folder1]
-            folder2 = archive.add_folder("Foundations of Rocket Science")
+            folder2 = archive.add_folder()
             assert set(archive.folders) == {folder1, folder2}
+            assert folder1 != folder2
             archive.remove_folder(folder1)
             assert archive.folders == [folder2]
             archive.remove_folder(folder2)
@@ -264,10 +266,11 @@ class TestArchive(object):
             archive = Archive(tempdir)
 
             assert archive.authors == []
-            author1 = archive.add_author("Dr. Max Mustermann")
+            author1 = archive.add_author()
             assert archive.authors == [author1]
-            author2 = archive.add_author("Prof. Dr. Jane Doe")
+            author2 = archive.add_author()
             assert set(archive.authors) == {author1, author2}
+            assert author1 != author2
             archive.remove_author(author1)
             assert archive.authors == [author2]
             archive.remove_author(author2)

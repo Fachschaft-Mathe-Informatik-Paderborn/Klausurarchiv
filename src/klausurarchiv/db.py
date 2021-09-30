@@ -3,7 +3,7 @@ import importlib.resources as import_res
 import os
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from flask import g, current_app
 
@@ -308,28 +308,39 @@ class Archive(object):
     def items(self) -> List[Item]:
         return [Item(item_id[0], self.__db, self.docs_path) for item_id in self.__db.execute("select ID from Items")]
 
-    def add_item(self, attributes: Dict) -> Item:
+    def add_item(self,
+                 name: str = "",
+                 date: Optional[datetime.date] = None,
+                 documents: List[int] = None,
+                 authors: List[int] = None,
+                 courses: List[int] = None,
+                 folders: List[int] = None,
+                 visible: bool = False) -> Item:
         cursor = self.__db.execute(
             "insert into Items(name, date, visible) values (?, ?, ?)",
-            (attributes["name"], attributes["date"], attributes["visible"])
+            (name, date, visible)
         )
         item = Item(cursor.lastrowid, self.__db, self.docs_path)
-        self.__db.executemany(
-            "insert into ItemDocumentMap values (?, ?)",
-            ((item.item_id, doc_id) for doc_id in attributes["documents"])
-        )
-        self.__db.executemany(
-            "insert into ItemAuthorMap values (?, ?)",
-            ((item.item_id, author_id) for author_id in attributes["authors"])
-        )
-        self.__db.executemany(
-            "insert into ItemCourseMap values (?, ?)",
-            ((item.item_id, course_id) for course_id in attributes["courses"])
-        )
-        self.__db.executemany(
-            "insert into ItemFolderMap values (?, ?)",
-            ((item.item_id, folder_id) for folder_id in attributes["folders"])
-        )
+        if documents is not None:
+            self.__db.executemany(
+                "insert into ItemDocumentMap values (?, ?)",
+                ((item.item_id, doc_id) for doc_id in documents)
+            )
+        if authors is not None:
+            self.__db.executemany(
+                "insert into ItemAuthorMap values (?, ?)",
+                ((item.item_id, author_id) for author_id in authors)
+            )
+        if courses is not None:
+            self.__db.executemany(
+                "insert into ItemCourseMap values (?, ?)",
+                ((item.item_id, course_id) for course_id in courses)
+            )
+        if folders is not None:
+            self.__db.executemany(
+                "insert into ItemFolderMap values (?, ?)",
+                ((item.item_id, folder_id) for folder_id in folders)
+            )
         return item
 
     def remove_item(self, item: Item):
@@ -339,10 +350,13 @@ class Archive(object):
     def documents(self) -> List[Document]:
         return [Document(self.__db, row[0], self.docs_path) for row in self.__db.execute("select ID from Documents")]
 
-    def add_document(self, attributes: Dict) -> Document:
+    def add_document(self,
+                     filename: str = "",
+                     downloadable: bool = False,
+                     content_type: str = "") -> Document:
         cursor = self.__db.execute(
             "insert into Documents(filename, downloadable, content_type) values (?, ?, ?)",
-            (attributes["filename"], attributes["downloadable"], attributes["content-type"])
+            (filename, downloadable, content_type)
         )
         return Document(self.__db, cursor.lastrowid, self.docs_path)
 
@@ -353,10 +367,10 @@ class Archive(object):
     def courses(self) -> List[Course]:
         return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
 
-    def add_course(self, attributes: Dict) -> Course:
+    def add_course(self, long_name: str = "", short_name: str = "") -> Course:
         cursor = self.__db.execute(
             "insert into Courses(long_name, short_name) values (?, ?)",
-            (attributes["long_name"], attributes["short_name"])
+            (long_name, short_name)
         )
         return Course(cursor.lastrowid, self.__db)
 
@@ -367,10 +381,10 @@ class Archive(object):
     def folders(self) -> List[Folder]:
         return [Folder(row[0], self.__db) for row in self.__db.execute("select ID from Folders")]
 
-    def add_folder(self, attributes: Dict) -> Folder:
+    def add_folder(self, name: str = "") -> Folder:
         cursor = self.__db.execute(
             "insert into Folders(name) values (?)",
-            (attributes["name"],)
+            (name,)
         )
         return Folder(cursor.lastrowid, self.__db)
 
@@ -381,10 +395,10 @@ class Archive(object):
     def authors(self) -> List[Author]:
         return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
 
-    def add_author(self, attributes: Dict) -> Author:
+    def add_author(self, name: str = "") -> Author:
         cursor = self.__db.execute(
             "insert into Authors(name) values (?)",
-            (attributes["name"],)
+            (name,)
         )
         return Author(cursor.lastrowid, self.__db)
 
