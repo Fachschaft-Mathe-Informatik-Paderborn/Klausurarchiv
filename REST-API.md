@@ -18,7 +18,7 @@
 |-------------------|-----------|---------------------------------------------------------------|
 | `filename`        | `str`     | Filename of the document.                                     |
 | `downloadable`    | `bool`    | True iff the document is downloadable by unauthorized users.  |
-| `content_type`    | `str`     | The [media type](https://en.wikipedia.org/wiki/Media_type) of the document. |
+| `content-type`    | `str`     | The [media type](https://en.wikipedia.org/wiki/Media_type) of the document. |
 
 Only the following content types are allowed:
 
