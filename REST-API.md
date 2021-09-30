@@ -157,21 +157,17 @@ The resource was created. The body is an object of the following schema:
 |-|-|-|
 | `id` | `int` | The ID of the newly created resource. The new resource will be available as `/v1/<resource>s/<id>`. |
 
-## `PUT /v1/<resource>s/<id:int>`
+## `PATCH /v1/<resource>s/<id:int>`
 
-Update a resource, create it if necessary.
+Update a resource.
 
 ### Request
 
-The body is a `ResourceClass` object.
+The body is a possibly partial `ResourceClass` object. Object attributes that are not included in the request will not be changed. Compound attributes (i.e. `Item.documents`) will be completely replaced, not updated.
 
 ### Response 200 "Ok"
 
-The resource existed before and it's contents were replaced. The body is an empty object.
-
-### Response 201 "Created"
-
-The resource didn't exist before and it was created. The body is an empty object.
+The resource was updated. The body is an empty object.
 
 ## `DELETE /v1/<resource>s/<id:int>`
 
