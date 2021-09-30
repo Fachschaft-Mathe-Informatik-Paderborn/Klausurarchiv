@@ -49,6 +49,21 @@ Only the following content types are allowed:
 |---------------|-------|---------------------------|
 | `name`        | `str` | Full name of the author.  |
 
+# Error Handling
+
+In case of an error, the server will always respond with a fitting HTTP status code and a body object of the following schema:
+
+| Attribute | Type | Description |
+|-|-|-|
+| `message` | `str` | A short description of the problem. |
+
+The following status codes may occur:
+
+* 400 "Bad Request": May occur with requests that have a non-empty request body. It means that the request is malformed, for example because the JSON object could not be parsed, because attributes are missing or because attributes have the wrong type.
+* 401 "Unauthorized": May occur with requests that access hidden resources or modify the database. It means that the user is either not logged in or that the user lacks the authorization to perform the request.
+* 404 "Not Found": May occur with any request. It means that the requested ressource does not exist.
+* 500 "Internal Server Error": May occur with any request. It means that an internal error occurred and that the server was unable to perform the request. If you get this request, please let your server's admin know so the problem can be fixed.
+
 # Login and Authorization
 
 The Klausurarchiv server requires authorization for certain requests. This authorization is provided with the following endpoints and is stored in the `KLAUSURARCHIV` cookie. This cookie should be set in all requests since it is used to check the authorization of the user.
@@ -70,30 +85,6 @@ The body is an object of the following schema:
 
 The login was successful and the session information is stored in the `KLAUSURARCHIV` cookie. If the user was logged in before, they were first logged out and is now logged in with the new information. The body is an empty object.
 
-### Response 400 "Bad Request"
-
-The request body is malformed. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 401 "Unauthorized"
-
-The provided username and/or password is wrong, or the user is not authorized to login. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an empty object. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
 ## `POST /v1/logout`
 
 Log out of the server.
@@ -105,14 +96,6 @@ The body is an empty object.
 ### Response 200 "Ok"
 
 The logout was successful and the session information is removed from the `KLAUSURARCHIV` cookie. This response will also be sent if the user wasn't logged in before as the resulting state is the same.
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an empty object. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
 
 # Resources
 
@@ -146,14 +129,6 @@ The body is an empty object.
 
 The query was successful. The body is an object of type `{int:ResourceClass}`, where resource IDs are mapped to resources. Resources the user is not authorized to access are not included and therefore, the response may be different depending on the class and client's authorization.
 
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
 ## `GET /v1/<resource>s/<id:int>`
 
 Get a specific resource from the archive.
@@ -165,30 +140,6 @@ The body is an empty object.
 ### Response 200 "Ok"
 
 The query was successful. The body is a `ResourceClass` object.
-
-### Response 404 "Not Found"
-
-The requested resource does not exist. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 401 "Unauthorized"
-
-The client lacks authorization to access the resource. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
 
 ## `POST /v1/<resource>s/`
 
@@ -204,31 +155,7 @@ The resource was created. The body is an object of the following schema:
 
 | Attribute | Type | Description |
 |-|-|-|
-| `id` | `int` | The ID of the newly created resource. The new resource will be available as `/v1/<resource>s/<id>`.
-
-### Response 400 "Bad Request"
-
-The request body is not a well-formed resource. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem, i.e. which attribute is missing or which reference is illegal. |
-
-### Response 401 "Unauthorized"
-
-The client lacks authorization to create an resource. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
+| `id` | `int` | The ID of the newly created resource. The new resource will be available as `/v1/<resource>s/<id>`. |
 
 ## `PUT /v1/<resource>s/<id:int>`
 
@@ -246,30 +173,6 @@ The resource existed before and it's contents were replaced. The body is an empt
 
 The resource didn't exist before and it was created. The body is an empty object.
 
-### Response 400 "Bad Request"
-
-The request body is not a well-formed resource. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem, i.e. which attribute is missing or which reference is illegal. |
-
-### Response 401 "Unauthorized"
-
-The client lacks authorization to create or update an resource. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
 ## `DELETE /v1/<resource>s/<id:int>`
 
 Delete an resource from the archive.
@@ -281,30 +184,6 @@ The body is an empty object.
 ### Response 200 "Ok"
 
 The query was successful. The body is a `ResourceClass` object.
-
-### Response 404 "Not Found"
-
-The requested resource does not exist. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 401 "Unauthorized"
-
-The client lacks authorization to delete the resource, usually because the client is not logged in and the resource is invisible. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
 
 # Document content up- and downloads
 
@@ -326,22 +205,6 @@ The body of an upload request is exactly the document's content.
 
 The file was successfully uploaded. The body is empty.
 
-### Response 401 "Unauthorized"
-
-The client lacks authorization to upload the document. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
 ## `GET /v1/download`
 
 Download the requested document.
@@ -362,27 +225,3 @@ The body of the response is the content of the requested document. The following
 |-|-|
 | `Content-Type` | The content type of the document. |
 | `Content-Disposition` | Set to `attachment`, with the filename. |
-
-### Response 401 "Unauthorized"
-
-The client lacks the authorization to download the document.
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 404 "Not Found"
-
-The requested document does not exist. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
-
-### Response 500 "Internal Server Error"
-
-An internal error occurred. The body is an object of the following schema:
-
-| Attribute | Type | Description |
-|-|-|-|
-| `message` | `str` | A short description of the problem. |
