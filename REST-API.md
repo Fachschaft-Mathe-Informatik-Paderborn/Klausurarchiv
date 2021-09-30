@@ -5,7 +5,7 @@
 | Attribute     | Type      | Description                                               |
 |---------------|-----------|-----------------------------------------------------------|
 | `name`        | `str`     | Display name of the item                                  |
-| `date`        | `str`     | Associated date of the item, in iso format: YYYY-MM-DD    |
+| `date`        | `str?`    | Associated date of the item, in iso format: YYYY-MM-DD    |
 | `documents`   | `[int]`   | List of associated document IDs.                          |
 | `authors`     | `[int]`   | List of associated author IDs.                            |
 | `courses`     | `[int]`   | List of associated course IDs.                            |
