@@ -1,34 +1,12 @@
-import json
+from functools import wraps
+from typing import Dict, Callable
 
 from flask import Response, Blueprint, request, session, make_response
-from werkzeug.exceptions import HTTPException, BadRequest, Unauthorized
-from typing import Dict, Callable
-from functools import wraps
+from werkzeug.exceptions import BadRequest, Unauthorized
 
 from klausurarchiv.db import *
 
 bp = Blueprint("interface-v1", __name__, url_prefix="/v1")
-
-
-@bp.errorhandler(Exception)
-def handle_http_exception(e: Exception):
-    if isinstance(e, HTTPException):
-        return Response(
-            response=json.dumps({
-                "message": e.description,
-            }),
-            status=e.code,
-            content_type="application/json"
-        )
-    else:
-        print(e)
-        return Response(
-            response=json.dumps({
-                "message": "Internal Server Error",
-            }),
-            status=500,
-            content_type="application/json"
-        )
 
 
 def data_validated(attributes: Dict[str, type]) -> Callable:

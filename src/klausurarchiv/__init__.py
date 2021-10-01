@@ -2,6 +2,9 @@ from flask import Flask
 from flask_cors import CORS
 
 from klausurarchiv import webapp, db
+from werkzeug.exceptions import HTTPException
+from flask import Response
+import json
 
 
 def create_app(test_config=None):
@@ -24,6 +27,26 @@ def create_app(test_config=None):
         app.secret_key = archive.secret_key
     except FileNotFoundError:
         pass
+
+    @app.errorhandler(Exception)
+    def handle_http_exception(e: Exception):
+        if isinstance(e, HTTPException):
+            return Response(
+                response=json.dumps({
+                    "message": e.description,
+                }),
+                status=e.code,
+                content_type="application/json"
+            )
+        else:
+            app.logger.error(e, exc_info=True)
+            return Response(
+                response=json.dumps({
+                    "message": "Internal Server Error",
+                }),
+                status=500,
+                content_type="application/json"
+            )
 
     app.teardown_appcontext(db.Archive.close_singleton)
     app.register_blueprint(webapp.bp)
