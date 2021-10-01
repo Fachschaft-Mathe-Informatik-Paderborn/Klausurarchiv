@@ -355,11 +355,12 @@ class Archive(object):
     def remove_item(self, item: Item):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
-    def get_item(self, item_id: int) -> Item:
+    def get_item(self, item_id: int) -> Optional[Item]:
         cursor = self.__db.execute("select count(ID) from Items where ID=?", (item_id,))
-        if cursor.fetchone()[0] == 0:
-            raise KeyError()
-        return Item(item_id, self.__db, self.docs_path)
+        if cursor.fetchone()[0] == 1:
+            return Item(item_id, self.__db, self.docs_path)
+        else:
+            return None
 
     @property
     def documents(self) -> List[Document]:
@@ -378,11 +379,12 @@ class Archive(object):
     def remove_document(self, document: Document):
         self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
 
-    def get_document(self, document_id: int) -> Document:
+    def get_document(self, document_id: int) -> Optional[Document]:
         cursor = self.__db.execute("select count(ID) from Documents where ID=?", (document_id,))
-        if cursor.fetchone()[0] == 0:
-            raise KeyError()
-        return Document(self.__db, document_id, self.docs_path)
+        if cursor.fetchone()[0] == 1:
+            return Document(self.__db, document_id, self.docs_path)
+        else:
+            return None
 
     @property
     def courses(self) -> List[Course]:
@@ -398,11 +400,12 @@ class Archive(object):
     def remove_course(self, course: Course):
         self.__db.execute("delete from Courses where ID=?", (course.course_id,))
 
-    def get_course(self, course_id: int) -> Course:
+    def get_course(self, course_id: int) -> Optional[Course]:
         cursor = self.__db.execute("select count(ID) from Courses where ID=?", (course_id,))
-        if cursor.fetchone()[0] == 0:
-            raise KeyError()
-        return Course(course_id, self.__db)
+        if cursor.fetchone()[0] == 1:
+            return Course(course_id, self.__db)
+        else:
+            return None
 
     @property
     def folders(self) -> List[Folder]:
@@ -418,11 +421,12 @@ class Archive(object):
     def remove_folder(self, folder: Folder):
         self.__db.execute("delete from Folders where ID=?", (folder.folder_id,))
 
-    def get_folder(self, folder_id: int) -> Folder:
+    def get_folder(self, folder_id: int) -> Optional[Folder]:
         cursor = self.__db.execute("select count(ID) from Folders where ID=?", (folder_id,))
-        if cursor.fetchone()[0] == 0:
-            raise KeyError()
-        return Folder(folder_id, self.__db)
+        if cursor.fetchone()[0] == 1:
+            return Folder(folder_id, self.__db)
+        else:
+            return None
 
     @property
     def authors(self) -> List[Author]:
@@ -438,14 +442,15 @@ class Archive(object):
     def remove_author(self, author: Author):
         self.__db.execute("delete from Authors where ID=?", (author.author_id,))
 
-    def get_author(self, author_id: int) -> Author:
+    def get_author(self, author_id: int) -> Optional[Author]:
         cursor = self.__db.execute("select count(ID) from Authors where ID=?", (author_id,))
-        if cursor.fetchone()[0] == 0:
-            raise KeyError()
-        return Author(author_id, self.__db)
+        if cursor.fetchone()[0] == 1:
+            return Author(author_id, self.__db)
+        else:
+            return None
 
     def __eq__(self, other: 'Archive') -> bool:
         return self.path == other.path
 
-    def __new(self, other: 'Archive') -> bool:
+    def __ne__(self, other: 'Archive') -> bool:
         return not self.path == other.path

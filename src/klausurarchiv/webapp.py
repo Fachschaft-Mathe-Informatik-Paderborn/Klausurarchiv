@@ -100,9 +100,8 @@ def post_folder():
 @bp.get("/folders/<int:folder_id>")
 def get_folder(folder_id: int):
     archive = Archive.get_singleton()
-    try:
-        folder = archive.get_folder(folder_id)
-    except KeyError:
+    folder = archive.get_folder(folder_id)
+    if folder is None:
         raise NotFound("The requested resource does not exist")
     return make_response({"name": folder.name})
 
@@ -112,9 +111,8 @@ def get_folder(folder_id: int):
 @autocommit
 def delete_folder(folder_id: int):
     archive = Archive.get_singleton()
-    try:
-        folder = archive.get_folder(folder_id)
-    except KeyError:
+    folder = archive.get_folder(folder_id)
+    if folder is None:
         raise NotFound("The requested resource does not exist")
     archive.remove_folder(folder)
     return make_response({})
@@ -127,9 +125,8 @@ def delete_folder(folder_id: int):
 def patch_folder(folder_id: int):
     data = request.get_json()
     archive = Archive.get_singleton()
-    try:
-        folder = archive.get_folder(folder_id)
-    except KeyError:
+    folder = archive.get_folder(folder_id)
+    if folder is None:
         raise NotFound("The requested resource does not exist")
     if "name" in data:
         folder.name = data["name"]
