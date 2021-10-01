@@ -1,3 +1,4 @@
+import json
 from functools import wraps
 from typing import Dict, Callable
 
@@ -94,7 +95,7 @@ def post_folder():
     data = request.get_json()
     archive = Archive.get_singleton()
     new_folder = archive.add_folder(**data)
-    return make_response({"id": new_folder.folder_id})
+    return make_response({"id": new_folder.folder_id}, 201)
 
 
 @bp.get("/folders/<int:folder_id>")
