@@ -2,24 +2,27 @@ from functools import wraps
 from typing import Dict, Callable
 
 from flask import Response, Blueprint, request, session, make_response
-from werkzeug.exceptions import BadRequest, Unauthorized
+from werkzeug.exceptions import BadRequest, Unauthorized, NotFound
 
 from klausurarchiv.db import *
 
 bp = Blueprint("interface-v1", __name__, url_prefix="/v1")
 
 
-def data_validated(attributes: Dict[str, type]) -> Callable:
+def data_validated(attributes: Dict[str, type], partial: bool = False) -> Callable:
     def decorator(view: Callable):
         @wraps(view)
         def wrapper(*args, **kwargs):
             data = request.get_json()
-            if data is None:
+            if data is None and not partial:
                 raise BadRequest("Request body may not be empty")
 
             for attr_name, attr_type in attributes.items():
                 if attr_name not in data:
-                    raise BadRequest(f"{attr_name} is missing")
+                    if partial:
+                        continue
+                    else:
+                        raise BadRequest(f"{attr_name} is missing")
                 if not isinstance(data[attr_name], attr_type):
                     raise BadRequest(f"{attr_name} must be of type \"{attr_type.__name__}\"")
 
@@ -95,17 +98,39 @@ def post_folder():
 
 
 @bp.get("/folders/<int:folder_id>")
-def get_folder(folder_id):
+def get_folder(folder_id: int):
     archive = Archive.get_singleton()
-    folder = archive.get_folder(folder_id)
+    try:
+        folder = archive.get_folder(folder_id)
+    except KeyError:
+        raise NotFound("The requested resource does not exist")
     return make_response({"name": folder.name})
 
 
 @bp.delete("/folders/<int:folder_id>")
 @authorized
 @autocommit
-def delete_folder(folder_id):
+def delete_folder(folder_id: int):
     archive = Archive.get_singleton()
-    folder = archive.get_folder(folder_id)
+    try:
+        folder = archive.get_folder(folder_id)
+    except KeyError:
+        raise NotFound("The requested resource does not exist")
     archive.remove_folder(folder)
+    return make_response({})
+
+
+@bp.patch("/folders/<int:folder_id>")
+@authorized
+@data_validated(attributes={"name": str}, partial=True)
+@autocommit
+def patch_folder(folder_id: int):
+    data = request.get_json()
+    archive = Archive.get_singleton()
+    try:
+        folder = archive.get_folder(folder_id)
+    except KeyError:
+        raise NotFound("The requested resource does not exist")
+    if "name" in data:
+        folder.name = data["name"]
     return make_response({})

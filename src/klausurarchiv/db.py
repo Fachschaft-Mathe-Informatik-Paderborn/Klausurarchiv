@@ -356,6 +356,9 @@ class Archive(object):
         self.__db.execute("delete from Items where Id = ?", (item.item_id,))
 
     def get_item(self, item_id: int) -> Item:
+        cursor = self.__db.execute("select count(ID) from Items where ID=?", (item_id,))
+        if cursor.fetchone()[0] == 0:
+            raise KeyError()
         return Item(item_id, self.__db, self.docs_path)
 
     @property
@@ -376,6 +379,9 @@ class Archive(object):
         self.__db.execute("delete from Documents where ID=?", (document.doc_id,))
 
     def get_document(self, document_id: int) -> Document:
+        cursor = self.__db.execute("select count(ID) from Documents where ID=?", (document_id,))
+        if cursor.fetchone()[0] == 0:
+            raise KeyError()
         return Document(self.__db, document_id, self.docs_path)
 
     @property
@@ -393,6 +399,9 @@ class Archive(object):
         self.__db.execute("delete from Courses where ID=?", (course.course_id,))
 
     def get_course(self, course_id: int) -> Course:
+        cursor = self.__db.execute("select count(ID) from Courses where ID=?", (course_id,))
+        if cursor.fetchone()[0] == 0:
+            raise KeyError()
         return Course(course_id, self.__db)
 
     @property
@@ -410,6 +419,9 @@ class Archive(object):
         self.__db.execute("delete from Folders where ID=?", (folder.folder_id,))
 
     def get_folder(self, folder_id: int) -> Folder:
+        cursor = self.__db.execute("select count(ID) from Folders where ID=?", (folder_id,))
+        if cursor.fetchone()[0] == 0:
+            raise KeyError()
         return Folder(folder_id, self.__db)
 
     @property
@@ -427,6 +439,9 @@ class Archive(object):
         self.__db.execute("delete from Authors where ID=?", (author.author_id,))
 
     def get_author(self, author_id: int) -> Author:
+        cursor = self.__db.execute("select count(ID) from Authors where ID=?", (author_id,))
+        if cursor.fetchone()[0] == 0:
+            raise KeyError()
         return Author(author_id, self.__db)
 
     def __eq__(self, other: 'Archive') -> bool:
