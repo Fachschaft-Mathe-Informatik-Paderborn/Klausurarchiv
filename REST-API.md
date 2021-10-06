@@ -179,7 +179,7 @@ The body is an empty object.
 
 ### Response 200 "Ok"
 
-The query was successful. The body is a `ResourceClass` object.
+The query was successful. The body is an empty object.
 
 # Document content up- and downloads
 
