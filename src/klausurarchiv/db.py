@@ -3,26 +3,168 @@ import importlib.resources as import_res
 import os
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
+from werkzeug.exceptions import BadRequest, NotFound
+from flask import Flask, request
 
-from flask import g, current_app
+from flask import g, current_app, make_response, Response
 
 
-class Entry(object):
+class Resource(object):
+
+    ATTRIBUTE_SCHEMA = dict()
+    RESOURCE_PATH = ""
+
+    @classmethod
+    def validate_data(cls, data: Dict, may_be_partial: bool = False):
+        if data is None:
+            raise BadRequest("Request body may not be empty")
+        if not isinstance(data, Dict):
+            raise BadRequest("Request body must be an object")
+        for (attribute_name, attribute_type) in cls.ATTRIBUTE_SCHEMA.items():
+            if attribute_name not in data:
+                if may_be_partial:
+                    continue
+                else:
+                    raise BadRequest(f"Attribute \"{attribute_name}\" is missing")
+            if not isinstance(data[attribute_name], attribute_type):
+                raise BadRequest(
+                    f"Attribute \"{attribute_name}\" must be of type \"{attribute_type.__name__}\""
+                )
+
+    @classmethod
+    def register_resource(cls, app: Flask):
+        def get_entry(entry_id: int) -> Resource:
+            entry = cls.get_entry(Archive.get_singleton(), entry_id)
+            if entry is None:
+                raise NotFound("The requested resource does not exist")
+            return entry
+
+        def commit_and_make_response(data: Dict, status=200) -> Response:
+            response = make_response(data, status)
+            Archive.get_singleton().commit()
+            return response
+
+        @app.get(f"{cls.RESOURCE_PATH}", endpoint=f"GET {cls.RESOURCE_PATH}")
+        def get_all():
+            return make_response({
+                entry.entry_id: entry.dict
+                for entry in cls.get_entries(Archive.get_singleton())
+            })
+
+        @app.get(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"GET {cls.RESOURCE_PATH}/id")
+        def get(entry_id: int):
+            return make_response(cls.get_entry(Archive.get_singleton(), entry_id).dict)
+
+        @app.post(f"{cls.RESOURCE_PATH}", endpoint=f"POST {cls.RESOURCE_PATH}")
+        def post():
+            entry = cls.new_entry(Archive.get_singleton(), request.get_json())
+            return commit_and_make_response({"id": entry.entry_id}, 201)
+
+        @app.patch(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"PATCH {cls.RESOURCE_PATH}/id")
+        def patch(entry_id: int):
+            get_entry(entry_id).update(request.get_json())
+            return commit_and_make_response({})
+
+        @app.delete(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"DELETE {cls.RESOURCE_PATH}/id")
+        def delete(entry_id: int):
+            get_entry(entry_id).delete()
+            return commit_and_make_response({})
+
+    @classmethod
+    def get_entries(cls, archive: 'Archive') -> List['Resource']:
+        raise NotImplementedError
+
+    @classmethod
+    def get_entry(cls, archive: 'Archive', entry_id: int) -> Optional['Resource']:
+        raise NotImplementedError
+
+    @classmethod
+    def new_entry(cls, archive: 'Archive', data: Dict) -> 'Resource':
+        raise NotImplementedError
+
     @property
     def entry_id(self) -> int:
         raise NotImplementedError
 
+    @property
+    def dict(self) -> Dict:
+        raise NotImplementedError
 
-class Document(Entry):
+    def update(self, data: Dict):
+        raise NotImplementedError
+
+    def delete(self):
+        raise NotImplementedError
+
+
+class Document(Resource):
     def __init__(self, db: sqlite3.Connection, doc_id: int, docs_path: Path):
         self.__db = db
         self.__doc_id = doc_id
         self.__docs_path = docs_path
 
+    ATTRIBUTE_SCHEMA = {
+        "filename": str,
+        "downloadable": bool,
+        "content_type": str
+    }
+    RESOURCE_PATH = "/v1/documents"
+    
+    @classmethod
+    def validate_data(cls, data: Dict, may_be_partial: bool = False):
+        super(Document, cls).validate_data(data, may_be_partial)
+        allowed_content_types = [
+            "application/msword", "application/pdf", "application/x-latex", "image/png", "image/jpeg", "image/gif",
+            "text/plain"
+        ]
+        if "content_type" in data and data["content_type"] not in allowed_content_types:
+            raise BadRequest("Illegal content type")
+
+    @classmethod
+    def get_entries(cls, archive: 'Archive') -> List['Document']:
+        return [Document(archive.db, row[0], archive.docs_path) for row in archive.db.execute("select ID from Documents")]
+
+    @classmethod
+    def get_entry(cls, archive: 'Archive', document_id: int) -> Optional['Document']:
+        cursor = archive.db.execute("select count(ID) from Documents where ID=?", (document_id,))
+        if cursor.fetchone()[0] == 1:
+            return Document(archive.db, document_id, archive.docs_path)
+        else:
+            return None
+
+    @classmethod
+    def new_entry(cls, archive: 'Archive', data: Dict) -> 'Document':
+        cls.validate_data(data)
+        cursor = archive.db.execute(
+            "insert into Documents(filename, downloadable, content_type) values (?, ?, ?)",
+            (data["filename"], data["downloadable"], data["content_type"])
+        )
+        return Document(archive.db, cursor.lastrowid, archive.docs_path)
+
     @property
     def entry_id(self) -> int:
         return self.__doc_id
+
+    @property
+    def dict(self) -> Dict:
+        return {
+            "filename": self.filename,
+            "downloadable": self.downloadable,
+            "content_type": self.content_type
+        }
+
+    def update(self, data: Dict):
+        self.validate_data(data, may_be_partial=True)
+        if "filename" in data:
+            self.filename = data["filename"]
+        if "downloadable" in data:
+            self.downloadable = data["downloadable"]
+        if "content_type" in data:
+            self.content_type = data["content_type"]
+
+    def delete(self):
+        self.__db.execute("delete from Documents where ID=?", (self.entry_id,))
 
     @property
     def filename(self) -> str:
@@ -69,14 +211,58 @@ class Document(Entry):
         return hash((self.__db, self.entry_id))
 
 
-class Course(Entry):
+class Course(Resource):
     def __init__(self, course_id: int, db: sqlite3.Connection):
         self.__courses_id = course_id
         self.__db = db
 
+    ATTRIBUTE_SCHEMA = {
+        "long_name": str,
+        "short_name": str
+    }
+    RESOURCE_PATH = "/v1/courses"
+
+    @classmethod
+    def get_entries(cls, archive: 'Archive') -> List['Course']:
+        return [Course(row[0], archive.db) for row in archive.db.execute("select ID from Courses")]
+
+    @classmethod
+    def get_entry(cls, archive: 'Archive', entry_id: int) -> Optional['Course']:
+        cursor = archive.db.execute("select count(ID) from Courses where ID=?", (entry_id,))
+        if cursor.fetchone()[0] == 1:
+            return Course(entry_id, archive.db)
+        else:
+            return None
+
+    @classmethod
+    def new_entry(cls, archive: 'Archive', data: Dict) -> 'Course':
+        cls.validate_data(data)
+        cursor = archive.db.execute(
+            "insert into Courses(long_name, short_name) values (?, ?)",
+            (data["long_name"], data["short_name"])
+        )
+        return Course(cursor.lastrowid, archive.db)
+
     @property
     def entry_id(self) -> int:
         return self.__courses_id
+
+    @property
+    def dict(self) -> Dict:
+        return {
+            "long_name": self.long_name,
+            "short_name": self.short_name
+        }
+
+    def update(self, data: Dict):
+        self.validate_data(data, may_be_partial=True)
+        if "long_name" in data:
+            self.long_name = data["long_name"]
+        if "short_name" in data:
+            self.short_name = data["short_name"]
+
+    def delete(self):
+        self.__db.execute("delete from Courses where ID=?", (self.entry_id,))
 
     @property
     def long_name(self) -> str:
@@ -106,14 +292,54 @@ class Course(Entry):
         return hash((self.entry_id, self.__db))
 
 
-class Folder(Entry):
+class Folder(Resource):
     def __init__(self, folder_id: int, db: sqlite3.Connection):
         self.__folder_id = folder_id
         self.__db = db
 
+    ATTRIBUTE_SCHEMA = {
+        "name": str
+    }
+    RESOURCE_PATH = "/v1/folders"
+
+    @classmethod
+    def get_entries(cls, archive: 'Archive') -> List['Folder']:
+        return [Folder(row[0], archive.db) for row in archive.db.execute("select ID from Folders")]
+
+    @classmethod
+    def get_entry(cls, archive: 'Archive', folder_id: int) -> Optional['Folder']:
+        cursor = archive.db.execute("select count(ID) from Folders where ID=?", (folder_id,))
+        if cursor.fetchone()[0] == 1:
+            return Folder(folder_id, archive.db)
+        else:
+            return None
+
+    @classmethod
+    def new_entry(cls, archive: 'Archive', data: Dict) -> 'Folder':
+        cls.validate_data(data)
+        cursor = archive.db.execute(
+            "insert into Folders(name) values (?)",
+            (data["name"],)
+        )
+        return Folder(cursor.lastrowid, archive.db)
+
     @property
     def entry_id(self) -> int:
         return self.__folder_id
+
+    @property
+    def dict(self) -> Dict:
+        return {
+            "name": self.name
+        }
+
+    def update(self, data: Dict):
+        self.validate_data(data, may_be_partial=True)
+        if "name" in data:
+            self.name = data["name"]
+
+    def delete(self):
+        self.__db.execute("delete from Folders where ID=?", (self.entry_id,))
 
     @property
     def name(self) -> str:
@@ -135,7 +361,7 @@ class Folder(Entry):
         return hash((self.entry_id, self.__db))
 
 
-class Author(Entry):
+class Author(Resource):
     def __init__(self, author_id: int, db: sqlite3.Connection):
         self.__author_id = author_id
         self.__db = db
@@ -163,7 +389,7 @@ class Author(Entry):
         return hash((self.entry_id, self.__db))
 
 
-class Item(Entry):
+class Item(Resource):
     def __init__(self, item_id: int, db: sqlite3.Connection, docs_dir: Path):
         self.__item_id = item_id
         self.__db = db
@@ -271,11 +497,11 @@ class Archive(object):
 
         # Check database
         database_exists = self.db_path.exists()
-        self.__db: sqlite3.Connection = sqlite3.connect(self.db_path)
+        self.db: sqlite3.Connection = sqlite3.connect(self.db_path)
         if not database_exists:
             import klausurarchiv
             with import_res.open_text(klausurarchiv, "schema.sql") as f:
-                self.__db.executescript(f.read())
+                self.db.executescript(f.read())
 
         # Check secret
         if not self.secret_path.exists():
@@ -284,7 +510,7 @@ class Archive(object):
             self.secret_path.chmod(0o400)
 
     def commit(self):
-        self.__db.commit()
+        self.db.commit()
 
     @staticmethod
     def get_singleton():
@@ -321,7 +547,7 @@ class Archive(object):
 
     @property
     def items(self) -> List[Item]:
-        return [Item(item_id[0], self.__db, self.docs_path) for item_id in self.__db.execute("select ID from Items")]
+        return [Item(item_id[0], self.db, self.docs_path) for item_id in self.db.execute("select ID from Items")]
 
     def add_item(self,
                  name: str = "",
@@ -331,127 +557,61 @@ class Archive(object):
                  courses: List[int] = None,
                  folders: List[int] = None,
                  visible: bool = False) -> Item:
-        cursor = self.__db.execute(
+        cursor = self.db.execute(
             "insert into Items(name, date, visible) values (?, ?, ?)",
             (name, date, visible)
         )
-        item = Item(cursor.lastrowid, self.__db, self.docs_path)
+        item = Item(cursor.lastrowid, self.db, self.docs_path)
         if documents is not None:
-            self.__db.executemany(
+            self.db.executemany(
                 "insert into ItemDocumentMap values (?, ?)",
                 ((item.entry_id, doc_id) for doc_id in documents)
             )
         if authors is not None:
-            self.__db.executemany(
+            self.db.executemany(
                 "insert into ItemAuthorMap values (?, ?)",
                 ((item.entry_id, author_id) for author_id in authors)
             )
         if courses is not None:
-            self.__db.executemany(
+            self.db.executemany(
                 "insert into ItemCourseMap values (?, ?)",
                 ((item.entry_id, course_id) for course_id in courses)
             )
         if folders is not None:
-            self.__db.executemany(
+            self.db.executemany(
                 "insert into ItemFolderMap values (?, ?)",
                 ((item.entry_id, folder_id) for folder_id in folders)
             )
         return item
 
     def remove_item(self, item: Item):
-        self.__db.execute("delete from Items where Id = ?", (item.entry_id,))
+        self.db.execute("delete from Items where Id = ?", (item.entry_id,))
 
     def get_item(self, item_id: int) -> Optional[Item]:
-        cursor = self.__db.execute("select count(ID) from Items where ID=?", (item_id,))
+        cursor = self.db.execute("select count(ID) from Items where ID=?", (item_id,))
         if cursor.fetchone()[0] == 1:
-            return Item(item_id, self.__db, self.docs_path)
-        else:
-            return None
-
-    @property
-    def documents(self) -> List[Document]:
-        return [Document(self.__db, row[0], self.docs_path) for row in self.__db.execute("select ID from Documents")]
-
-    def add_document(self,
-                     filename: str = "",
-                     downloadable: bool = False,
-                     content_type: str = "") -> Document:
-        cursor = self.__db.execute(
-            "insert into Documents(filename, downloadable, content_type) values (?, ?, ?)",
-            (filename, downloadable, content_type)
-        )
-        return Document(self.__db, cursor.lastrowid, self.docs_path)
-
-    def remove_document(self, document: Document):
-        self.__db.execute("delete from Documents where ID=?", (document.entry_id,))
-
-    def get_document(self, document_id: int) -> Optional[Document]:
-        cursor = self.__db.execute("select count(ID) from Documents where ID=?", (document_id,))
-        if cursor.fetchone()[0] == 1:
-            return Document(self.__db, document_id, self.docs_path)
-        else:
-            return None
-
-    @property
-    def courses(self) -> List[Course]:
-        return [Course(row[0], self.__db) for row in self.__db.execute("select ID from Courses")]
-
-    def add_course(self, long_name: str = "", short_name: str = "") -> Course:
-        cursor = self.__db.execute(
-            "insert into Courses(long_name, short_name) values (?, ?)",
-            (long_name, short_name)
-        )
-        return Course(cursor.lastrowid, self.__db)
-
-    def remove_course(self, course: Course):
-        self.__db.execute("delete from Courses where ID=?", (course.entry_id,))
-
-    def get_course(self, course_id: int) -> Optional[Course]:
-        cursor = self.__db.execute("select count(ID) from Courses where ID=?", (course_id,))
-        if cursor.fetchone()[0] == 1:
-            return Course(course_id, self.__db)
-        else:
-            return None
-
-    @property
-    def folders(self) -> List[Folder]:
-        return [Folder(row[0], self.__db) for row in self.__db.execute("select ID from Folders")]
-
-    def add_folder(self, name: str = "") -> Folder:
-        cursor = self.__db.execute(
-            "insert into Folders(name) values (?)",
-            (name,)
-        )
-        return Folder(cursor.lastrowid, self.__db)
-
-    def remove_folder(self, folder: Folder):
-        self.__db.execute("delete from Folders where ID=?", (folder.entry_id,))
-
-    def get_folder(self, folder_id: int) -> Optional[Folder]:
-        cursor = self.__db.execute("select count(ID) from Folders where ID=?", (folder_id,))
-        if cursor.fetchone()[0] == 1:
-            return Folder(folder_id, self.__db)
+            return Item(item_id, self.db, self.docs_path)
         else:
             return None
 
     @property
     def authors(self) -> List[Author]:
-        return [Author(row[0], self.__db) for row in self.__db.execute("select ID from Authors")]
+        return [Author(row[0], self.db) for row in self.db.execute("select ID from Authors")]
 
     def add_author(self, name: str = "") -> Author:
-        cursor = self.__db.execute(
+        cursor = self.db.execute(
             "insert into Authors(name) values (?)",
             (name,)
         )
-        return Author(cursor.lastrowid, self.__db)
+        return Author(cursor.lastrowid, self.db)
 
     def remove_author(self, author: Author):
-        self.__db.execute("delete from Authors where ID=?", (author.entry_id,))
+        self.db.execute("delete from Authors where ID=?", (author.entry_id,))
 
     def get_author(self, author_id: int) -> Optional[Author]:
-        cursor = self.__db.execute("select count(ID) from Authors where ID=?", (author_id,))
+        cursor = self.db.execute("select count(ID) from Authors where ID=?", (author_id,))
         if cursor.fetchone()[0] == 1:
-            return Author(author_id, self.__db)
+            return Author(author_id, self.db)
         else:
             return None
 
