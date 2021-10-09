@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
-from werkzeug.exceptions import BadRequest, NotFound
 from flask import Flask, make_response, request
+from werkzeug.exceptions import BadRequest, NotFound
 
 from klausurarchiv import db
 
@@ -32,19 +32,19 @@ class Resource(object):
                 raise NotFound("The requested resource does not exist")
             return entry
 
-        @app.get(f"{path}")
+        @app.get(f"{path}", endpoint=f"GET {path}")
         def get_all():
             return make_response({
                 entry.entry_id: self.entry_to_dict(entry)
                 for entry in self.all_entries()
             })
 
-        @app.get(f"{path}/<int:entry_id>")
+        @app.get(f"{path}/<int:entry_id>", endpoint=f"GET {path}/id")
         def get(entry_id: int):
             entry = get_entry(entry_id)
             return make_response(self.entry_to_dict(entry))
 
-        @app.post(f"{path}")
+        @app.post(f"{path}", endpoint=f"POST {path}")
         def post():
             data = get_request_data()
 
@@ -54,7 +54,7 @@ class Resource(object):
             db.Archive.get_singleton().commit()
             return response
 
-        @app.patch(f"{path}/<int:entry_id>")
+        @app.patch(f"{path}/<int:entry_id>", endpoint=f"PATCH {path}/id")
         def patch(entry_id: int):
             data = get_request_data(may_be_partial=True)
             entry = get_entry(entry_id)
@@ -65,7 +65,7 @@ class Resource(object):
             db.Archive.get_singleton().commit()
             return response
 
-        @app.delete(f"{path}/<int:entry_id>")
+        @app.delete(f"{path}/<int:entry_id>", endpoint=f"DELETE {path}/id")
         def delete(entry_id: int):
             entry = get_entry(entry_id)
 
@@ -100,6 +100,51 @@ class Resource(object):
         raise NotImplementedError
 
 
+class Document(Resource):
+    ATTRIBUTE_SCHEMA = {
+        "filename": str,
+        "downloadable": bool,
+        "content_type": str
+    }
+
+    ALLOWED_CONTENT_TYPES = [
+        "application/msword", "application/pdf", "application/x-latex", "image/png", "image/jpeg", "image/gif",
+        "text/plain"
+    ]
+
+    def get_entry(self, entry_id: int) -> Optional[db.Document]:
+        return self.archive.get_document(entry_id)
+
+    def all_entries(self) -> List[db.Document]:
+        return self.archive.documents
+
+    def entry_to_dict(self, entry: db.Document) -> Dict:
+        return {
+            "filename": entry.filename,
+            "downloadable": entry.downloadable,
+            "content_type": entry.content_type
+        }
+
+    def post(self, data: Dict) -> db.Document:
+        if data["content_type"] not in self.ALLOWED_CONTENT_TYPES:
+            raise BadRequest("Illegal content_type")
+        return self.archive.add_document(filename=data["filename"], downloadable=data["downloadable"],
+                                         content_type=data["content_type"])
+
+    def patch(self, entry: db.Document, data: Dict):
+        if "filename" in data:
+            entry.filename = data["filename"]
+        if "downloadable" in data:
+            entry.downloadable = data["downloadable"]
+        if "content_type" in data:
+            if data["content_type"] not in self.ALLOWED_CONTENT_TYPES:
+                raise BadRequest("Illegal content type")
+            entry.content_type = data["content_type"]
+
+    def delete(self, entry: db.Document):
+        self.archive.remove_document(entry)
+
+
 class Folder(Resource):
     ATTRIBUTE_SCHEMA = {
         "name": str
@@ -128,5 +173,5 @@ class Folder(Resource):
 
 
 def create_app(app: Flask):
-    for (resource, path) in [(Folder(), "/v1/folders")]:
+    for (resource, path) in [(Folder(), "/v1/folders"), (Document(), "/v1/documents")]:
         resource.register_resource(app, path)
