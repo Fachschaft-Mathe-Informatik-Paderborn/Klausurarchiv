@@ -100,7 +100,7 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.get_json() == initial_data
 
     # Partial Patching
-    response: TestResponse = client.patch(f"/v1/{resource_name}/{rs_id}", json={})
+    response: TestResponse = client.patch(f"/v1/{resource_name}/{rs_id}", json=partial_patch)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -150,7 +150,7 @@ def test_documents_work(client):
         "content_type": "application/pdf"
     }
     partial_patch = {
-        "downloadable": False
+        "downloadable": True
     }
     full_patch = {
         "filename": "exam.tex",
@@ -158,6 +158,22 @@ def test_documents_work(client):
         "content_type": "application/x-latex"
     }
     template_test_resource(client, "documents", full_data, partial_patch, full_patch)
+
+
+@authenticated
+def test_courses_work(client):
+    full_data = {
+        "long_name": "Rocket Sceince",
+        "short_name": "RS"
+    }
+    partial_path = {
+        "long_name": "Rocket Science"
+    }
+    full_patch = {
+        "long_name": "Foundations of Rocket Science",
+        "short_name": "FRS"
+    }
+    template_test_resource(client, "courses", full_data, partial_path, full_patch)
 
 
 @authenticated

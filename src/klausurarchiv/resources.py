@@ -145,6 +145,37 @@ class Document(Resource):
         self.archive.remove_document(entry)
 
 
+class Course(Resource):
+    ATTRIBUTE_SCHEMA = {
+        "long_name": str,
+        "short_name": str
+    }
+
+    def get_entry(self, entry_id: int) -> Optional[db.Course]:
+        return self.archive.get_course(entry_id)
+
+    def all_entries(self) -> List[db.Course]:
+        return self.archive.courses
+
+    def entry_to_dict(self, entry: db.Course) -> Dict:
+        return {
+            "long_name": entry.long_name,
+            "short_name": entry.short_name
+        }
+
+    def post(self, data: Dict) -> db.Course:
+        return self.archive.add_course(short_name=data["short_name"], long_name=data["long_name"])
+
+    def patch(self, entry: db.Course, data: Dict):
+        if "long_name" in data:
+            entry.long_name = data["long_name"]
+        if "short_name" in data:
+            entry.short_name = data["short_name"]
+
+    def delete(self, entry: db.Course):
+        self.archive.remove_course(entry)
+
+
 class Folder(Resource):
     ATTRIBUTE_SCHEMA = {
         "name": str
@@ -173,5 +204,5 @@ class Folder(Resource):
 
 
 def create_app(app: Flask):
-    for (resource, path) in [(Folder(), "/v1/folders"), (Document(), "/v1/documents")]:
+    for (resource, path) in [(Document(), "/v1/documents"), (Course(), "/v1/courses"), (Folder(), "/v1/folders")]:
         resource.register_resource(app, path)
