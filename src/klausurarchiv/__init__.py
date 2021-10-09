@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 
-from klausurarchiv import webapp, db
+from klausurarchiv import webapp, db, resources
 from werkzeug.exceptions import HTTPException
 from flask import Response
 import json
@@ -50,5 +50,6 @@ def create_app(test_config=None):
 
     app.teardown_appcontext(db.Archive.close_singleton)
     app.register_blueprint(webapp.bp)
+    resources.create_app(app)
 
     return app

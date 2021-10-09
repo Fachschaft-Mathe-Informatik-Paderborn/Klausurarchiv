@@ -222,20 +222,20 @@ class TestArchive(object):
 
             item_a = archive.add_item()
             assert archive.items == [item_a]
-            assert archive.get_item(item_a.item_id) == item_a
+            assert archive.get_item(item_a.entry_id) == item_a
 
             item_b = archive.add_item()
             assert item_a != item_b
             assert set(archive.items) == {item_a, item_b}
-            assert archive.get_item(item_b.item_id) == item_b
+            assert archive.get_item(item_b.entry_id) == item_b
 
             archive.remove_item(item_a)
             assert archive.items == [item_b]
-            assert archive.get_item(item_a.item_id) is None
+            assert archive.get_item(item_a.entry_id) is None
 
             archive.remove_item(item_b)
             assert archive.items == []
-            assert archive.get_item(item_b.item_id) is None
+            assert archive.get_item(item_b.entry_id) is None
 
     def test_documents(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -244,20 +244,20 @@ class TestArchive(object):
 
             doc_a = archive.add_document()
             assert archive.documents == [doc_a]
-            assert archive.get_document(doc_a.doc_id) == doc_a
+            assert archive.get_document(doc_a.entry_id) == doc_a
 
             doc_b = archive.add_document()
             assert doc_a != doc_b
             assert set(archive.documents) == {doc_a, doc_b}
-            assert archive.get_document(doc_b.doc_id) == doc_b
+            assert archive.get_document(doc_b.entry_id) == doc_b
 
             archive.remove_document(doc_a)
             assert archive.documents == [doc_b]
-            assert archive.get_document(doc_a.doc_id) is None
+            assert archive.get_document(doc_a.entry_id) is None
 
             archive.remove_document(doc_b)
             assert archive.documents == []
-            assert archive.get_document(doc_b.doc_id) is None
+            assert archive.get_document(doc_b.entry_id) is None
 
     def test_courses(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -266,20 +266,20 @@ class TestArchive(object):
 
             course1 = archive.add_course()
             assert archive.courses == [course1]
-            assert archive.get_course(course1.course_id) == course1
+            assert archive.get_course(course1.entry_id) == course1
 
             course2 = archive.add_course()
             assert set(archive.courses) == {course1, course2}
             assert course1 != course2
-            assert archive.get_course(course2.course_id) == course2
+            assert archive.get_course(course2.entry_id) == course2
 
             archive.remove_course(course1)
             assert archive.courses == [course2]
-            assert archive.get_course(course1.course_id) is None
+            assert archive.get_course(course1.entry_id) is None
 
             archive.remove_course(course2)
             assert archive.courses == []
-            assert archive.get_course(course2.course_id) is None
+            assert archive.get_course(course2.entry_id) is None
 
     def test_folders(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -288,20 +288,20 @@ class TestArchive(object):
 
             folder1 = archive.add_folder()
             assert archive.folders == [folder1]
-            assert archive.get_folder(folder1.folder_id) == folder1
+            assert archive.get_folder(folder1.entry_id) == folder1
 
             folder2 = archive.add_folder()
             assert set(archive.folders) == {folder1, folder2}
             assert folder1 != folder2
-            assert archive.get_folder(folder2.folder_id) == folder2
+            assert archive.get_folder(folder2.entry_id) == folder2
 
             archive.remove_folder(folder1)
             assert archive.folders == [folder2]
-            assert archive.get_folder(folder1.folder_id) is None
+            assert archive.get_folder(folder1.entry_id) is None
 
             archive.remove_folder(folder2)
             assert archive.folders == []
-            assert archive.get_folder(folder2.folder_id) is None
+            assert archive.get_folder(folder2.entry_id) is None
 
     def test_authors(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -310,17 +310,17 @@ class TestArchive(object):
 
             author1 = archive.add_author()
             assert archive.authors == [author1]
-            assert archive.get_author(author1.author_id) == author1
+            assert archive.get_author(author1.entry_id) == author1
 
             author2 = archive.add_author()
             assert set(archive.authors) == {author1, author2}
             assert author1 != author2
-            assert archive.get_author(author2.author_id) == author2
+            assert archive.get_author(author2.entry_id) == author2
 
             archive.remove_author(author1)
             assert archive.authors == [author2]
-            assert archive.get_author(author1.author_id) is None
+            assert archive.get_author(author1.entry_id) is None
 
             archive.remove_author(author2)
             assert archive.authors == []
-            assert archive.get_author(author2.author_id) is None
+            assert archive.get_author(author2.entry_id) is None
