@@ -362,13 +362,49 @@ class Folder(Resource):
 
 
 class Author(Resource):
+
+    ATTRIBUTE_SCHEMA = {
+        "name": str
+    }
+    RESOURCE_PATH = "/v1/authors"
+
     def __init__(self, author_id: int, db: sqlite3.Connection):
         self.__author_id = author_id
         self.__db = db
 
+    @classmethod
+    def get_entries(cls, archive: 'Archive') -> List['Author']:
+        return [Author(row[0], archive.db) for row in archive.db.execute("select ID from Authors")]
+
+    @classmethod
+    def get_entry(cls, archive: 'Archive', entry_id: int) -> Optional['Author']:
+        cursor = archive.db.execute("select count(ID) from Authors where ID=?", (entry_id,))
+        if cursor.fetchone()[0] == 1:
+            return Author(entry_id, archive.db)
+        else:
+            return None
+
+    @classmethod
+    def new_entry(cls, archive: 'Archive', data: Dict) -> 'Author':
+        cursor = archive.db.execute("insert into Authors(name) values (?)", (data["name"],))
+        return Author(cursor.lastrowid, archive.db)
+
     @property
     def entry_id(self) -> int:
         return self.__author_id
+
+    @property
+    def dict(self) -> Dict:
+        return {
+            "name": self.name
+        }
+
+    def update(self, data: Dict):
+        if "name" in data:
+            self.name = data["name"]
+
+    def delete(self):
+        self.__db.execute("delete from Authors where ID=?", (self.entry_id,))
 
     @property
     def name(self) -> str:
@@ -591,27 +627,6 @@ class Archive(object):
         cursor = self.db.execute("select count(ID) from Items where ID=?", (item_id,))
         if cursor.fetchone()[0] == 1:
             return Item(item_id, self.db, self.docs_path)
-        else:
-            return None
-
-    @property
-    def authors(self) -> List[Author]:
-        return [Author(row[0], self.db) for row in self.db.execute("select ID from Authors")]
-
-    def add_author(self, name: str = "") -> Author:
-        cursor = self.db.execute(
-            "insert into Authors(name) values (?)",
-            (name,)
-        )
-        return Author(cursor.lastrowid, self.db)
-
-    def remove_author(self, author: Author):
-        self.db.execute("delete from Authors where ID=?", (author.entry_id,))
-
-    def get_author(self, author_id: int) -> Optional[Author]:
-        cursor = self.db.execute("select count(ID) from Authors where ID=?", (author_id,))
-        if cursor.fetchone()[0] == 1:
-            return Author(author_id, self.db)
         else:
             return None
 

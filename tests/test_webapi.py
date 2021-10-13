@@ -186,3 +186,15 @@ def test_folders_work(client):
         "name": "Foundations of Rocket Science"
     }
     template_test_resource(client, "folders", full_data, partial_patch, full_patch)
+
+
+@authenticated
+def test_authors_work(client):
+    full_data = {
+        "name": "John Doe"
+    }
+    partial_patch = {}
+    full_patch = {
+        "name": "John Mustermann-Doe"
+    }
+    template_test_resource(client, "authors", full_data, partial_patch, full_patch)
