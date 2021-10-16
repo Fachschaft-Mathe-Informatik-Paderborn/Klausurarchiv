@@ -53,7 +53,7 @@ def create_app(test_config=None):
 
     app.teardown_appcontext(db.Archive.close_singleton)
     app.register_blueprint(webapp.bp)
-    for resource in [db.Document, db.Course, db.Folder, db.Author]:
+    for resource in [db.Document, db.Course, db.Folder, db.Author, db.Item]:
         resource.register_resource(app)
 
     return app

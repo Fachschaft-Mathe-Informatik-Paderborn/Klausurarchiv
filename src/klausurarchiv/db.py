@@ -4,10 +4,10 @@ import os
 import sqlite3
 from pathlib import Path
 from typing import List, Optional, Dict
-from werkzeug.exceptions import BadRequest, NotFound
-from flask import Flask, request
 
-from flask import g, current_app, make_response, Response
+from flask import Flask, request
+from flask import g, make_response, Response
+from werkzeug.exceptions import BadRequest, NotFound
 
 
 class Archive(object):
@@ -72,8 +72,8 @@ class Archive(object):
 
 
 class Resource(object):
-
     ATTRIBUTE_SCHEMA = dict()
+    TABLE_NAME = ""
     RESOURCE_PATH = ""
 
     def __init__(self, entry_id: int):
@@ -141,11 +141,15 @@ class Resource(object):
 
     @classmethod
     def get_entries(cls) -> List['Resource']:
-        raise NotImplementedError
+        return [cls(entry_id) for entry_id in g.archive.db.execute("select ID from ?", (cls.TABLE_NAME,))]
 
     @classmethod
     def get_entry(cls, entry_id: int) -> Optional['Resource']:
-        raise NotImplementedError
+        cursor = g.archive.db.execute("select ID from ? where ID = ?", (cls.TABLE_NAME, entry_id))
+        if cursor.fetchone()[0] == 1:
+            return cls(entry_id)
+        else:
+            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Resource':
@@ -169,7 +173,7 @@ class Document(Resource):
         "content_type": str
     }
     RESOURCE_PATH = "/v1/documents"
-    
+
     @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
         super(Document, cls).validate_data(data, may_be_partial)
@@ -179,18 +183,6 @@ class Document(Resource):
         ]
         if "content_type" in data and data["content_type"] not in allowed_content_types:
             raise BadRequest("Illegal content type")
-
-    @classmethod
-    def get_entries(cls) -> List['Document']:
-        return [Document(row[0]) for row in g.archive.db.execute("select ID from Documents")]
-
-    @classmethod
-    def get_entry(cls, document_id: int) -> Optional['Document']:
-        cursor = g.archive.db.execute("select count(ID) from Documents where ID=?", (document_id,))
-        if cursor.fetchone()[0] == 1:
-            return Document(document_id)
-        else:
-            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Document':
@@ -271,19 +263,8 @@ class Course(Resource):
         "long_name": str,
         "short_name": str
     }
+    TABLE_NAME = "Courses"
     RESOURCE_PATH = "/v1/courses"
-
-    @classmethod
-    def get_entries(cls) -> List['Course']:
-        return [Course(row[0]) for row in g.archive.db.execute("select ID from Courses")]
-
-    @classmethod
-    def get_entry(cls, entry_id: int) -> Optional['Course']:
-        cursor = g.archive.db.execute("select count(ID) from Courses where ID=?", (entry_id,))
-        if cursor.fetchone()[0] == 1:
-            return Course(entry_id)
-        else:
-            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Course':
@@ -343,19 +324,8 @@ class Folder(Resource):
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
+    TABLE_NAME = "Folders"
     RESOURCE_PATH = "/v1/folders"
-
-    @classmethod
-    def get_entries(cls) -> List['Folder']:
-        return [Folder(row[0]) for row in g.archive.db.execute("select ID from Folders")]
-
-    @classmethod
-    def get_entry(cls, folder_id: int) -> Optional['Folder']:
-        cursor = g.archive.db.execute("select count(ID) from Folders where ID=?", (folder_id,))
-        if cursor.fetchone()[0] == 1:
-            return Folder(folder_id)
-        else:
-            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Folder':
@@ -401,23 +371,11 @@ class Folder(Resource):
 
 
 class Author(Resource):
-
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
+    TABLE_NAME = "Authors"
     RESOURCE_PATH = "/v1/authors"
-
-    @classmethod
-    def get_entries(cls) -> List['Author']:
-        return [Author(row[0]) for row in g.archive.db.execute("select ID from Authors")]
-
-    @classmethod
-    def get_entry(cls, entry_id: int) -> Optional['Author']:
-        cursor = g.archive.db.execute("select count(ID) from Authors where ID=?", (entry_id,))
-        if cursor.fetchone()[0] == 1:
-            return Author(entry_id)
-        else:
-            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Author':
@@ -457,6 +415,82 @@ class Author(Resource):
 
 
 class Item(Resource):
+    ATTRIBUTE_SCHEMA = {
+        "name": str,
+        "date": str,
+        "documents": List,
+        "authors": List,
+        "courses": List,
+        "folders": List,
+        "visible": bool,
+    }
+    TABLE_NAME = "Items"
+    RESOURCE_PATH = "/v1/items"
+
+    @classmethod
+    def validate_data(cls, data: Dict, may_be_partial: bool = False):
+        super(Item, cls).validate_data(data, may_be_partial)
+
+        try:
+            if "date" in data and data["date"] is not None:
+                datetime.date.fromisoformat(data["date"])
+        except ValueError:
+            raise BadRequest(f"date must be an ISO-formatted date")
+
+        def validate_attribute(table_name, attribute_name):
+            if any(not isinstance(entry_id, int) for entry_id in data[attribute_name]):
+                raise BadRequest(f"{attribute_name} must contain integer IDs")
+            cursor = g.archive.db.execute("select count(ID) from ? where ID in ?", (table_name, data[attribute_name]))
+            if cursor.fetchone()[0] != len(data[attribute_name]):
+                raise BadRequest(f"{attribute_name} contains unknown IDs")
+
+        validate_attribute("Documents", "documents")
+        validate_attribute("Authors", "authors")
+        validate_attribute("Courses", "courses")
+        validate_attribute("Folders", "folders")
+
+    @classmethod
+    def new_entry(cls, data: Dict) -> 'Item':
+        cursor = g.archive.db.execute("insert into Items(name, date, visible) values (?, ?, ?)",
+                                      (data["name"], data["date"], data["visible"]))
+        item = Item(cursor.lastrowid)
+        item.documents = [Document(doc_id) for doc_id in data["documents"]]
+        item.authors = [Author(author_id) for author_id in data["authors"]]
+        item.courses = [Course(course_id) for course_id in data["courses"]]
+        item.folders = [Folder(folder_id) for folder_id in data["folders"]]
+        return item
+
+    @property
+    def dict(self):
+        return {
+            "name": self.name,
+            "date": self.date,
+            "documents": [document.entry_id for document in self.documents],
+            "authors": [author.entry_id for author in self.authors],
+            "courses": [course.entry_id for course in self.courses],
+            "folders": [folder.entry_id for folder in self.folders],
+            "visible": self.visible
+        }
+
+    def update(self, data: Dict):
+        if "name" in data:
+            self.name = data["name"]
+        if "date" in data:
+            self.date = data["date"]
+        if "documents" in data:
+            self.date = [Document(entry_id) for entry_id in data["documents"]]
+        if "authors" in data:
+            self.date = [Author(entry_id) for entry_id in data["authors"]]
+        if "courses" in data:
+            self.courses = [Course(entry_id) for entry_id in data["courses"]]
+        if "folders" in data:
+            self.courses = [Folder(entry_id) for entry_id in data["folders"]]
+        if "visible" in data:
+            self.visible = data["visible"]
+
+    def delete(self):
+        g.archive.db.execute("delete from Items where ID=?", (self.entry_id,))
+
     @property
     def name(self) -> str:
         cursor = g.archive.db.execute("select name from Items where ID=?", (self.entry_id,))
@@ -483,46 +517,52 @@ class Item(Resource):
         return [Document(int(row[0])) for row in
                 g.archive.db.execute("select DocumentID from ItemDocumentMap where ItemID=?", (self.entry_id,))]
 
-    def add_document(self, document: Document):
-        g.archive.db.execute("insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
-                          (self.entry_id, document.entry_id))
-
-    def remove_document(self, document: Document):
-        g.archive.db.execute("delete from ItemDocumentMap where ItemID=? and DocumentID=?",
-                          (self.entry_id, document.entry_id))
+    @documents.setter
+    def documents(self, new_documents: List[Document]):
+        g.archive.db.execute("delete from ItemDocumentMap where ItemID=?", (self.entry_id,))
+        g.archive.db.executemany(
+            "insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
+            (self.entry_id, document.entry_id for document in new_documents)
+        )
 
     @property
     def courses(self) -> List[Course]:
         return [Course(row[0]) for row in
                 g.archive.db.execute("select CourseID from ItemCourseMap where ItemID=?", (self.entry_id,))]
 
-    def add_course(self, course: Course):
-        g.archive.db.execute("insert into ItemCourseMap(ItemID, CourseID) values (?, ?)", (self.entry_id, course.entry_id))
-
-    def remove_course(self, course: Course):
-        g.archive.db.execute("delete from ItemCourseMap where ItemID=? and CourseID=?", (self.entry_id, course.entry_id))
+    @courses.setter
+    def courses(self, new_courses: List[Course]):
+        g.archive.db.execute("delete from ItemCourseMap where ItemID=?", (self.entry_id,))
+        g.archive.db.executemany(
+            "insert into ItemCourseMap(ItemID, CourseID) values (?, ?)",
+            (self.entry_id, course.entry_id for course in new_courses)
+        )
 
     @property
     def authors(self) -> List[Author]:
         return [Author(row[0]) for row in
                 g.archive.db.execute("select AuthorID from ItemAuthorMap where ItemID=?", (self.entry_id,))]
 
-    def add_author(self, author: Author):
-        g.archive.db.execute("insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)", (self.entry_id, author.entry_id))
-
-    def remove_author(self, author: Author):
-        g.archive.db.execute("delete from ItemAuthorMap where ItemID=? and AuthorID=?", (self.entry_id, author.entry_id))
+    @authors.setter
+    def authors(self, new_authors: List[Author]):
+        g.archive.db.execute("delete from ItemAuthorMap where ItemID=?", (self.entry_id,))
+        g.archive.db.executemany(
+            "insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)",
+            (self.entry_id, author.entry_id for author in new_authors)
+        )
 
     @property
     def folders(self) -> List[Folder]:
         return [Folder(row[0]) for row in
                 g.archive.db.execute("select FolderID from ItemFolderMap where ItemID=?", (self.entry_id,))]
 
-    def add_folder(self, folder: Folder):
-        g.archive.db.execute("insert into ItemFolderMap(ItemID, FolderID) values (?, ?)", (self.entry_id, folder.entry_id))
-
-    def remove_folder(self, folder: Folder):
-        g.archive.db.execute("delete from ItemFolderMap where ItemID=? and FolderID=?", (self.entry_id, folder.entry_id))
+    @folders.setter
+    def folders(self, new_folders: List[Folder]):
+        g.archive.db.execute("delete from ItemFolderMap where ItemID=?", (self.entry_id,))
+        g.archive.db.executemany(
+            "insert into ItemFolderMap(ItemID, FolderID) values (?, ?)",
+            (self.entry_id, folder.entry_id for folder in new_folders)
+        )
 
     @property
     def visible(self) -> bool:
