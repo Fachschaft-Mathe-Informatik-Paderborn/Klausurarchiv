@@ -161,6 +161,25 @@ def test_documents_work(client):
 
 
 @authenticated
+def test_upload_download(client):
+    response = client.post("/v1/documents", json={
+        "filename": "a.txt",
+        "content_type": "text/plain",
+        "downloadable": True
+    })
+    doc_id = response.get_json()["id"]
+
+    response = client.post(f"/v1/upload?id={doc_id}", content_type="text/plain", data=b"Hello World")
+    assert response.status_code == 200
+    assert response.get_json() == {}
+
+    response = client.get(f"/v1/download?id={doc_id}")
+    assert response.status_code == 200
+    assert response.data == b"Hello World"
+    assert response.content_type == "text/plain; charset=utf-8"
+
+
+@authenticated
 def test_courses_work(client):
     full_data = {
         "long_name": "Rocket Sceince",
