@@ -5,9 +5,10 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional, Dict
 
-from flask import Flask, request
+from flask import Flask, request, send_file
 from flask import g, make_response, Response
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge, Unauthorized
+from werkzeug.utils import secure_filename
 
 
 class Archive(object):
@@ -145,7 +146,7 @@ class Resource(object):
 
     @classmethod
     def get_entry(cls, entry_id: int) -> Optional['Resource']:
-        cursor = g.archive.db.execute(f"select ID from {cls.TABLE_NAME} where ID = ?", (entry_id,))
+        cursor = g.archive.db.execute(f"select count(ID) from {cls.TABLE_NAME} where ID = ?", (entry_id,))
         if cursor.fetchone()[0] == 1:
             return cls(entry_id)
         else:
@@ -182,8 +183,52 @@ class Document(Resource):
             "application/msword", "application/pdf", "application/x-latex", "image/png", "image/jpeg", "image/gif",
             "text/plain"
         ]
+        if "filename" in data and data["filename"] != secure_filename(data["filename"]):
+            raise BadRequest("Insecure filename")
         if "content_type" in data and data["content_type"] not in allowed_content_types:
             raise BadRequest("Illegal content type")
+
+    @classmethod
+    def register_resource(cls, app: Flask):
+        super(Document, cls).register_resource(app)
+
+        def get_requested_document() -> Document:
+            try:
+                doc_id = int(request.args["id"])
+            except KeyError:
+                raise BadRequest("Parameter id is required")
+            except ValueError:
+                raise BadRequest("Parameter id must be an integer")
+            return Document.get_entry(doc_id)
+
+        @app.post("/v1/upload")
+        def upload_document():
+            doc = get_requested_document()
+
+            if request.content_type != doc.content_type:
+                raise BadRequest("Illegal document type")
+            if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+                raise RequestEntityTooLarge()
+            with open(doc.path, mode="wb") as file:
+                file.write(request.get_data())
+
+            return make_response({})
+
+        @app.get("/v1/download")
+        def download_document():
+            doc = get_requested_document()
+
+            # Check if the document belongs to an invisible item or is not downloadable.
+            # If so, it may not be downloaded.
+            cursor = g.archive.db.execute("""
+                select count(Items.ID)
+                from Items inner join (select * from ItemDocumentMap where DocumentID = ?) IDM on Items.ID = IDM.ItemID
+                where Items.visible=0
+            """, (doc.entry_id,))
+            if cursor.fetchone()[0] != 0 or not doc.downloadable:
+                raise Unauthorized("You are not allowed to download this document")
+
+            return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Document':
@@ -239,10 +284,7 @@ class Document(Resource):
 
     @downloadable.setter
     def downloadable(self, downloadable: bool):
-        if downloadable:
-            downloadable = 1
-        else:
-            downloadable = 0
+        downloadable = 1 if downloadable else 0
         g.archive.db.execute("update Documents set downloadable=? where ID=?", (downloadable, self.entry_id))
 
     @property
@@ -569,6 +611,7 @@ class Item(Resource):
 
     @visible.setter
     def visible(self, new_visible: bool):
+        new_visible = 1 if new_visible else 0
         g.archive.db.execute("update Items set visible=? where ID=?", (new_visible, self.entry_id))
 
     def __eq__(self, other: 'Item') -> bool:

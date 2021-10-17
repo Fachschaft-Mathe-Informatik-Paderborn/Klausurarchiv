@@ -13,7 +13,7 @@ def create_app(test_config=None):
 
     app.config.from_mapping(
         ARCHIVE_PATH=app.instance_path,
-        MAX_CONTENT_PATH=int(100e6),
+        MAX_CONTENT_LENGTH=int(100e6),
         SESSION_COOKIE_NAME="KLAUSURARCHIV"
     )
 
