@@ -77,7 +77,7 @@ class Resource(object):
     RESOURCE_PATH = ""
 
     def __init__(self, entry_id: int):
-        self.__entry_id = entry_id
+        self.__entry_id: int = int(entry_id)
 
     @property
     def entry_id(self) -> int:
@@ -141,11 +141,11 @@ class Resource(object):
 
     @classmethod
     def get_entries(cls) -> List['Resource']:
-        return [cls(entry_id) for entry_id in g.archive.db.execute("select ID from ?", (cls.TABLE_NAME,))]
+        return [cls(entry_id[0]) for entry_id in g.archive.db.execute(f"select ID from {cls.TABLE_NAME}")]
 
     @classmethod
     def get_entry(cls, entry_id: int) -> Optional['Resource']:
-        cursor = g.archive.db.execute("select ID from ? where ID = ?", (cls.TABLE_NAME, entry_id))
+        cursor = g.archive.db.execute(f"select ID from {cls.TABLE_NAME} where ID = ?", (entry_id,))
         if cursor.fetchone()[0] == 1:
             return cls(entry_id)
         else:
@@ -172,6 +172,7 @@ class Document(Resource):
         "downloadable": bool,
         "content_type": str
     }
+    TABLE_NAME = "Documents"
     RESOURCE_PATH = "/v1/documents"
 
     @classmethod
@@ -478,13 +479,13 @@ class Item(Resource):
         if "date" in data:
             self.date = data["date"]
         if "documents" in data:
-            self.date = [Document(entry_id) for entry_id in data["documents"]]
+            self.documents = [Document(entry_id) for entry_id in data["documents"]]
         if "authors" in data:
-            self.date = [Author(entry_id) for entry_id in data["authors"]]
+            self.authors = [Author(entry_id) for entry_id in data["authors"]]
         if "courses" in data:
             self.courses = [Course(entry_id) for entry_id in data["courses"]]
         if "folders" in data:
-            self.courses = [Folder(entry_id) for entry_id in data["folders"]]
+            self.folders = [Folder(entry_id) for entry_id in data["folders"]]
         if "visible" in data:
             self.visible = data["visible"]
 
@@ -501,16 +502,13 @@ class Item(Resource):
         g.archive.db.execute("update Items set name=? where ID=?", (new_name, self.entry_id))
 
     @property
-    def date(self) -> Optional[datetime.date]:
+    def date(self) -> Optional[str]:
         cursor = g.archive.db.execute("select date from Items where ID=?", (self.entry_id,))
-        date = cursor.fetchone()[0]
-        if date is not None:
-            date = datetime.date.fromisoformat(date)
-        return date
+        return cursor.fetchone()[0]
 
     @date.setter
-    def date(self, new_date: Optional[datetime.date]):
-        g.archive.db.execute("update Items set date=? where ID=?", (new_date.isoformat(), self.entry_id))
+    def date(self, new_date: Optional[str]):
+        g.archive.db.execute("update Items set date=? where ID=?", (new_date, self.entry_id))
 
     @property
     def documents(self) -> List[Document]:
@@ -522,7 +520,7 @@ class Item(Resource):
         g.archive.db.execute("delete from ItemDocumentMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
-            (self.entry_id, document.entry_id for document in new_documents)
+            ((self.entry_id, document.entry_id) for document in new_documents)
         )
 
     @property
@@ -535,7 +533,7 @@ class Item(Resource):
         g.archive.db.execute("delete from ItemCourseMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemCourseMap(ItemID, CourseID) values (?, ?)",
-            (self.entry_id, course.entry_id for course in new_courses)
+            ((self.entry_id, course.entry_id) for course in new_courses)
         )
 
     @property
@@ -548,7 +546,7 @@ class Item(Resource):
         g.archive.db.execute("delete from ItemAuthorMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)",
-            (self.entry_id, author.entry_id for author in new_authors)
+            ((self.entry_id, author.entry_id) for author in new_authors)
         )
 
     @property
@@ -561,7 +559,7 @@ class Item(Resource):
         g.archive.db.execute("delete from ItemFolderMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemFolderMap(ItemID, FolderID) values (?, ?)",
-            (self.entry_id, folder.entry_id for folder in new_folders)
+            ((self.entry_id, folder.entry_id) for folder in new_folders)
         )
 
     @property

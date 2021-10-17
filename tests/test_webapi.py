@@ -198,3 +198,65 @@ def test_authors_work(client):
         "name": "John Mustermann-Doe"
     }
     template_test_resource(client, "authors", full_data, partial_patch, full_patch)
+
+
+@authenticated
+def test_items_work(client):
+    doc_a = client.post("/v1/documents", json={
+        "filename": "a.pdf",
+        "downloadable": True,
+        "content_type": "application/x-latex"
+    }).get_json()["id"]
+    doc_b = client.post("/v1/documents", json={
+        "filename": "b.pdf",
+        "downloadable": False,
+        "content_type": "application/x-latex"
+    }).get_json()["id"]
+
+    course_a = client.post("/v1/courses", json={
+        "long_name": "Rocket Science",
+        "short_name": "RS"
+    }).get_json()["id"]
+    course_b = client.post("/v1/courses", json={
+        "long_name": "Foundations of Rocket Science",
+        "short_name": "FRS"
+    }).get_json()["id"]
+
+    folder_a = client.post("/v1/folders", json={
+        "name": "Rocket Science"
+    }).get_json()["id"]
+    folder_b = client.post("/v1/folders", json={
+        "name": "Foundations of Rocket Science"
+    }).get_json()["id"]
+
+    author_a = client.post("/v1/authors", json={
+        "name": "Max Mustermann"
+    }).get_json()["id"]
+    author_b = client.post("/v1/authors", json={
+        "name": "John Doe"
+    }).get_json()["id"]
+
+    full_data = {
+        "name": "Foundations of Rocket Science",
+        "date": None,
+        "documents": [doc_a],
+        "authors": [author_a],
+        "courses": [course_a],
+        "folders": [folder_a],
+        "visible": False
+    }
+    partial_patch = {
+        "date": "2021-01-01",
+        "authors": [author_a, author_b]
+    }
+    full_patch = {
+        "name": "Rocket Science",
+        "date": "2021-12-24",
+        "documents": [doc_a, doc_b],
+        "authors": [author_a],
+        "courses": [course_a, course_b],
+        "folders": [folder_a, folder_b],
+        "visible": True
+    }
+
+    template_test_resource(client, "items", full_data, partial_patch, full_patch)
