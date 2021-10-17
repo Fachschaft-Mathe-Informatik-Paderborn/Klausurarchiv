@@ -2,3 +2,5 @@ __pycache__
 archive
 .idea
 pdfs
+*.egg-info
+dist
