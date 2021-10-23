@@ -8,7 +8,7 @@ setup(
     },
     packages=["klausurarchiv"],
     python_requires=">=3.9",
-    install_requires=["flask", "flask_cors"],
+    install_requires=["flask"],
     package_data={
         "klausurarchiv": ["schema.sql"]
     }
