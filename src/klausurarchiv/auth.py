@@ -1,5 +1,6 @@
 from flask import Flask, request, make_response
 from flask_login import UserMixin, LoginManager, login_user, logout_user
+from hashlib import sha256
 
 from klausurarchiv.db import validate_schema
 
@@ -29,7 +30,8 @@ def init_app(app: Flask):
             "password": str
         }, data)
 
-        if data["username"] == app.config["USERNAME"] and data["password"] == app.config["PASSWORD"]:
+        password_digest = sha256(bytes(data["password"], encoding="utf-8")).hexdigest()
+        if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
             login_user(User(data["username"]))
             return make_response({}, 200)
         else:
