@@ -13,7 +13,7 @@ from klausurarchiv import create_app
 @pytest.fixture
 def client() -> FlaskClient:
     with tempfile.TemporaryDirectory() as tempdir:
-        app = create_app({"TESTING": True, "ARCHIVE_PATH": tempdir})
+        app = create_app({"TESTING": True, "ARCHIVE_PATH": tempdir, "USERNAME": "john", "PASSWORD": "4711"})
 
         with app.test_client() as client:
             yield client
@@ -46,25 +46,45 @@ def test_login_logout(client: FlaskClient):
     response: TestResponse = logout(client)
     assert response.status_code == 200
     assert response.get_json() == {}
-    assert "username" not in session
+
+    # Making an unauthorized request
+    response: TestResponse = client.post("/v1/folders", json={
+        "name": "Folder1"
+    })
+    assert response.status_code == 401
 
     # Logging in
     response: TestResponse = login(client, "john", "4711")
     assert response.status_code == 200
     assert response.get_json() == {}
-    assert session["username"] == "john"
+
+    # Making an authorized request
+    response: TestResponse = client.post("/v1/folders", json={
+        "name": "Folder1"
+    })
+    assert response.status_code == 201
 
     # Logging in again, should not change state
     response: TestResponse = login(client, "john", "4711")
     assert response.status_code == 200
     assert response.get_json() == {}
-    assert session["username"] == "john"
+
+    # Making another unauthorized request
+    response: TestResponse = client.post("/v1/folders", json={
+        "name": "Folder1"
+    })
+    assert response.status_code == 201
 
     # Logging out
     response: TestResponse = logout(client)
     assert response.status_code == 200
     assert response.get_json() == {}
-    assert "username" not in session
+
+    # Making an unauthorized request
+    response: TestResponse = client.post("/v1/folders", json={
+        "name": "Folder1"
+    })
+    assert response.status_code == 401
 
     # Trying to log in with invalid credentials
     response: TestResponse = client.post("/v1/login", json={
@@ -72,8 +92,12 @@ def test_login_logout(client: FlaskClient):
         "password": "1612"
     })
     assert response.status_code == 401
-    assert "message" in response.get_json()
-    assert "username" not in session
+
+    # Making an unauthorized request
+    response: TestResponse = client.post("/v1/folders", json={
+        "name": "Folder1"
+    })
+    assert response.status_code == 401
 
 
 def template_test_resource(client: FlaskClient, resource_name: str, initial_data: Dict, partial_patch: Dict,

@@ -7,6 +7,7 @@ from typing import List, Optional, Dict
 
 from flask import Flask, request, send_file
 from flask import g, make_response, Response
+from flask_login import login_required
 from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge, Unauthorized
 from werkzeug.utils import secure_filename
 
@@ -38,12 +39,6 @@ class Archive(object):
     def commit(self):
         self.db.commit()
 
-    @staticmethod
-    def close_singleton(e=None):
-        archive = g.pop("archive", None)
-        if archive is not None:
-            del archive
-
     @property
     def secret_key(self) -> bytes:
         with open(self.secret_path, mode="rb") as file:
@@ -72,6 +67,23 @@ class Archive(object):
         return not self.path == other.path
 
 
+def validate_schema(schema: Dict, data: Dict, may_be_partial: bool = False):
+    if data is None:
+        raise BadRequest("Request body may not be empty")
+    if not isinstance(data, Dict):
+        raise BadRequest("Request body must be an object")
+    for (attribute_name, attribute_type) in schema.items():
+        if attribute_name not in data:
+            if may_be_partial:
+                continue
+            else:
+                raise BadRequest(f"Attribute \"{attribute_name}\" is missing")
+        if not isinstance(data[attribute_name], attribute_type):
+            raise BadRequest(
+                f"Attribute \"{attribute_name}\" must be of type \"{attribute_type.__name__}\""
+            )
+
+
 class Resource(object):
     ATTRIBUTE_SCHEMA = dict()
     TABLE_NAME = ""
@@ -86,20 +98,7 @@ class Resource(object):
 
     @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
-        if data is None:
-            raise BadRequest("Request body may not be empty")
-        if not isinstance(data, Dict):
-            raise BadRequest("Request body must be an object")
-        for (attribute_name, attribute_type) in cls.ATTRIBUTE_SCHEMA.items():
-            if attribute_name not in data:
-                if may_be_partial:
-                    continue
-                else:
-                    raise BadRequest(f"Attribute \"{attribute_name}\" is missing")
-            if not isinstance(data[attribute_name], attribute_type):
-                raise BadRequest(
-                    f"Attribute \"{attribute_name}\" must be of type \"{attribute_type.__name__}\""
-                )
+        validate_schema(cls.ATTRIBUTE_SCHEMA, data, may_be_partial)
 
     @classmethod
     def register_resource(cls, app: Flask):
@@ -126,16 +125,23 @@ class Resource(object):
             return make_response(cls.get_entry(entry_id).dict)
 
         @app.post(f"{cls.RESOURCE_PATH}", endpoint=f"POST {cls.RESOURCE_PATH}")
+        @login_required
         def post():
-            entry = cls.new_entry(request.get_json())
+            data = request.get_json()
+            cls.validate_data(data)
+            entry = cls.new_entry(data)
             return commit_and_make_response({"id": entry.entry_id}, 201)
 
         @app.patch(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"PATCH {cls.RESOURCE_PATH}/id")
+        @login_required
         def patch(entry_id: int):
-            get_entry(entry_id).update(request.get_json())
+            data = request.get_json()
+            cls.validate_data(data, may_be_partial=True)
+            get_entry(entry_id).update(data)
             return commit_and_make_response({})
 
         @app.delete(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"DELETE {cls.RESOURCE_PATH}/id")
+        @login_required
         def delete(entry_id: int):
             get_entry(entry_id).delete()
             return commit_and_make_response({})
@@ -460,7 +466,7 @@ class Author(Resource):
 class Item(Resource):
     ATTRIBUTE_SCHEMA = {
         "name": str,
-        "date": str,
+        # date is not included as it may be None and the normal check can't deal with that.
         "documents": List,
         "authors": List,
         "courses": List,
@@ -474,16 +480,28 @@ class Item(Resource):
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
         super(Item, cls).validate_data(data, may_be_partial)
 
-        try:
-            if "date" in data and data["date"] is not None:
-                datetime.date.fromisoformat(data["date"])
-        except ValueError:
-            raise BadRequest(f"date must be an ISO-formatted date")
+        if "date" in data:
+            if data["date"] is not None:
+                if not isinstance(data["date"], str):
+                    raise BadRequest("Attribute \"date\" must be of type \"str\"")
+
+                try:
+                    datetime.date.fromisoformat(data["date"])
+                except ValueError:
+                    raise BadRequest(f"date must be an ISO-formatted date")
+        elif not may_be_partial:
+            raise BadRequest("Attribute \"date\" is missing")
 
         def validate_attribute(table_name, attribute_name):
+            if may_be_partial and attribute_name not in data:
+                return
+
             if any(not isinstance(entry_id, int) for entry_id in data[attribute_name]):
                 raise BadRequest(f"{attribute_name} must contain integer IDs")
-            cursor = g.archive.db.execute("select count(ID) from ? where ID in ?", (table_name, data[attribute_name]))
+
+            placeholders = ", ".join("?" * len(data[attribute_name]))
+            query = f"select count(ID) from {table_name} where ID in ({placeholders})"
+            cursor = g.archive.db.execute(query, data[attribute_name])
             if cursor.fetchone()[0] != len(data[attribute_name]):
                 raise BadRequest(f"{attribute_name} contains unknown IDs")
 

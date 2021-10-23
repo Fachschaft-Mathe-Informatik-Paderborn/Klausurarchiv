@@ -1,10 +1,12 @@
-from flask import Flask
-from flask_cors import CORS
-
-from klausurarchiv import webapp, db
-from werkzeug.exceptions import HTTPException
-from flask import Response, g
 import json
+
+from flask import Flask
+from flask import Response, g
+from flask_cors import CORS
+from flask_login import LoginManager
+from werkzeug.exceptions import HTTPException
+
+from klausurarchiv import auth, db
 
 
 def create_app(test_config=None):
@@ -14,7 +16,9 @@ def create_app(test_config=None):
     app.config.from_mapping(
         ARCHIVE_PATH=app.instance_path,
         MAX_CONTENT_LENGTH=int(100e6),
-        SESSION_COOKIE_NAME="KLAUSURARCHIV"
+        SESSION_COOKIE_NAME="KLAUSURARCHIV",
+        USERNAME=None,
+        PASSWORD=None,
     )
 
     if test_config is None:
@@ -26,6 +30,9 @@ def create_app(test_config=None):
         app.secret_key = db.Archive(app.config["ARCHIVE_PATH"]).secret_key
     except FileNotFoundError:
         pass
+
+    login_manager = LoginManager()
+    login_manager.init_app(app)
 
     @app.errorhandler(Exception)
     def handle_http_exception(e: Exception):
@@ -51,8 +58,8 @@ def create_app(test_config=None):
     def open_archive():
         g.archive = db.Archive(app.config["ARCHIVE_PATH"])
 
-    app.teardown_appcontext(db.Archive.close_singleton)
-    app.register_blueprint(webapp.bp)
+    auth.init_app(app)
+
     for resource in [db.Document, db.Course, db.Folder, db.Author, db.Item]:
         resource.register_resource(app)
 
