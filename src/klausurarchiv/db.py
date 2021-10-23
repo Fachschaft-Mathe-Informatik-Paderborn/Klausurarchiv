@@ -3,11 +3,11 @@ import importlib.resources as import_res
 import os
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Type, TypeVar
 
 from flask import Flask, request, send_file
 from flask import g, make_response, Response
-from flask_login import login_required
+from flask_login import login_required, current_user
 from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge, Unauthorized
 from werkzeug.utils import secure_filename
 
@@ -84,6 +84,9 @@ def validate_schema(schema: Dict, data: Dict, may_be_partial: bool = False):
             )
 
 
+R = TypeVar('R', bound='Resource')
+
+
 class Resource(object):
     ATTRIBUTE_SCHEMA = dict()
     TABLE_NAME = ""
@@ -147,11 +150,11 @@ class Resource(object):
             return commit_and_make_response({})
 
     @classmethod
-    def get_entries(cls) -> List['Resource']:
+    def get_entries(cls: Type[R]) -> List[R]:
         return [cls(entry_id[0]) for entry_id in g.archive.db.execute(f"select ID from {cls.TABLE_NAME}")]
 
     @classmethod
-    def get_entry(cls, entry_id: int) -> Optional['Resource']:
+    def get_entry(cls: Type[R], entry_id: int) -> Optional[R]:
         cursor = g.archive.db.execute(f"select count(ID) from {cls.TABLE_NAME} where ID = ?", (entry_id,))
         if cursor.fetchone()[0] == 1:
             return cls(entry_id)
@@ -208,6 +211,7 @@ class Document(Resource):
             return Document.get_entry(doc_id)
 
         @app.post("/v1/upload")
+        @login_required
         def upload_document():
             doc = get_requested_document()
 
@@ -226,15 +230,24 @@ class Document(Resource):
 
             # Check if the document belongs to an invisible item or is not downloadable.
             # If so, it may not be downloaded.
-            cursor = g.archive.db.execute("""
-                select count(Items.ID)
-                from Items inner join (select * from ItemDocumentMap where DocumentID = ?) IDM on Items.ID = IDM.ItemID
-                where Items.visible=0
-            """, (doc.entry_id,))
-            if cursor.fetchone()[0] != 0 or not doc.downloadable:
+            if not doc.may_be_accessed():
                 raise Unauthorized("You are not allowed to download this document")
 
             return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
+
+    @classmethod
+    def get_entries(cls: R) -> List[R]:
+        entries: List['Document'] = super(Document, cls).get_entries()
+        if not current_user.is_authenticated:
+            entries = [entry for entry in entries if entry.may_be_accessed()]
+        return entries
+
+    @classmethod
+    def get_entry(cls: R, entry_id: int) -> Optional[R]:
+        entry: 'Document' = super(Document, cls).get_entry(entry_id)
+        if not entry.may_be_accessed():
+            raise Unauthorized("You are not allowed to access this resource")
+        return entry
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Document':
@@ -264,6 +277,16 @@ class Document(Resource):
 
     def delete(self):
         g.archive.db.execute("delete from Documents where ID=?", (self.entry_id,))
+
+    def may_be_accessed(self) -> bool:
+        if current_user.is_authenticated:
+            return True
+        cursor = g.archive.db.execute("""
+                select count(Items.ID)
+                from Items inner join (select * from ItemDocumentMap where DocumentID = ?) IDM on Items.ID = IDM.ItemID
+                where Items.visible=0
+            """, (self.entry_id,))
+        return cursor.fetchone()[0] == 0 and self.downloadable
 
     @property
     def filename(self) -> str:
@@ -509,6 +532,21 @@ class Item(Resource):
         validate_attribute("Authors", "authors")
         validate_attribute("Courses", "courses")
         validate_attribute("Folders", "folders")
+
+    @classmethod
+    def get_entries(cls: R) -> List[R]:
+        entries: List['Item'] = super(Item, cls).get_entries()
+        if not current_user.is_authenticated:
+            entries = [entry for entry in entries if entry.visible]
+        return entries
+
+    @classmethod
+    def get_entry(cls: R, entry_id: int) -> Optional[R]:
+        entry: 'Item' = super(Item, cls).get_entry(entry_id)
+        if current_user.is_authenticated or entry.visible:
+            return entry
+        else:
+            return None
 
     @classmethod
     def new_entry(cls, data: Dict) -> 'Item':
