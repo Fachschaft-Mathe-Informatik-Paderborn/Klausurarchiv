@@ -1,4 +1,5 @@
 import json
+import os
 
 from flask import Flask
 from flask import Response, g
@@ -10,7 +11,7 @@ from klausurarchiv import auth, db
 
 
 def create_app(test_config=None):
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__, instance_path=os.environ.get("KLAUSURARCHIV_INSTANCE"), instance_relative_config=True)
     CORS(app)
 
     app.config.from_mapping(
