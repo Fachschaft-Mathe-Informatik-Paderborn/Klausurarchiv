@@ -19,7 +19,7 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=int(100e6),
         SESSION_COOKIE_NAME="KLAUSURARCHIV",
         USERNAME=None,
-        PASSWORD=None,
+        PASSWORD_SHA256=None,
     )
 
     if test_config is None:
