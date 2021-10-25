@@ -116,7 +116,7 @@ class Resource(object):
             g.archive.commit()
             return response
 
-        @app.get(f"{cls.RESOURCE_PATH}", endpoint=f"GET {cls.RESOURCE_PATH}")
+        @app.get(f"{cls.RESOURCE_PATH}", endpoint=f"GET {cls.RESOURCE_PATH}", strict_slashes=False)
         def get_all():
             return make_response({
                 entry.entry_id: entry.dict
@@ -127,7 +127,7 @@ class Resource(object):
         def get(entry_id: int):
             return make_response(cls.get_entry(entry_id).dict)
 
-        @app.post(f"{cls.RESOURCE_PATH}", endpoint=f"POST {cls.RESOURCE_PATH}")
+        @app.post(f"{cls.RESOURCE_PATH}", endpoint=f"POST {cls.RESOURCE_PATH}", strict_slashes=False)
         @login_required
         def post():
             data = request.get_json()

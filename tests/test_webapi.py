@@ -167,6 +167,15 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.status_code == 200
     assert response.get_json() == {}
 
+    # Checking that trailing slashes work too
+    response: TestResponse = client.post(f"/v1/{resource_name}/", json=initial_data)
+    assert response.status_code == 201
+    rs_id = response.get_json()["id"]
+
+    response: TestResponse = client.get(f"/v1/{resource_name}/")
+    assert response.status_code == 200
+    assert response.get_json() == {str(rs_id) : initial_data}
+
 
 @authenticated
 def test_documents_work(client):
