@@ -12,7 +12,7 @@ from klausurarchiv import auth, db
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_path=os.environ.get("KLAUSURARCHIV_INSTANCE"), instance_relative_config=True)
-    CORS(app)
+    CORS(app, support_credentials=True)
 
     app.config.from_mapping(
         ARCHIVE_PATH=app.instance_path,
