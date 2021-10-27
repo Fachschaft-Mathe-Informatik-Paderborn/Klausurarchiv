@@ -33,11 +33,7 @@ def init_app(app: Flask):
         password_digest = sha256(bytes(data["password"], encoding="utf-8")).hexdigest()
         if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
             login_user(User(data["username"]))
-            response = make_response({}, 200)
-            # TODO: This might be dangerous, but otherwise our webapp doesn't work
-            # and I don't know enough to properly evaluate the risk.
-            response.access_control_allow_credentials = True
-            return response
+            return make_response({}, 200)
         else:
             return make_response({"message": "Invalid username or password"}, 401)
 
