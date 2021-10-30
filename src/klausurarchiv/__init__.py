@@ -12,7 +12,9 @@ from klausurarchiv import auth, db
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_path=os.environ.get("KLAUSURARCHIV_INSTANCE"), instance_relative_config=True)
-    CORS(app, support_credentials=True)
+
+    # should add the argument origins=["https://fsmi.uni-paderborn.de"] after deployment
+    CORS(app, supports_credentials=True)
 
     app.config.from_mapping(
         ARCHIVE_PATH=app.instance_path,
