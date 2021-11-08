@@ -24,20 +24,26 @@ class Archive(object):
     Attributes
     ----------
     path: Path
-
+        path at which all resources are located
     db_path: Path
 
     docs_path: Path
-
+        subfolder at which all documents are located
     secret_path: Path
-
+        subfolder at which the secret key is located (read-only)
     secret_key: bytes
+        byte representation of the secret key
     """
     def __init__(self, path: Path):
         """
-        Loads up the archive from a given path.
+        Initializes the archive from a given path.
 
         If path or subfolders for docs, database or the secret key do not yet exist, they will be created accordingly.
+
+        Parameters
+        ----------
+        path: Path
+            path to the location where all data will be saved
         """
         self.__path: Path = Path(path)
         if not self.__path.exists():
@@ -62,16 +68,12 @@ class Archive(object):
             self.secret_path.chmod(0o400)
 
     def commit(self):
-        """
-        Commits any changes to the database.
-        """
+        """Commits any changes to the database."""
         self.db.commit()
 
     @property
     def secret_key(self) -> bytes:
-        """
-        Reads the secret key from the corresponding file.
-        """
+        """Reads the secret key from the corresponding file."""
         with open(self.secret_path, mode="rb") as file:
             return file.read()
 
@@ -584,7 +586,6 @@ class Author(Resource):
 
 
 class Item(Resource):
-<<<<<<< Updated upstream
     """A named collection of documents by a list of authors regarding a number of courses in a folder structure.
 
     Attributes
