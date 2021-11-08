@@ -6,6 +6,11 @@ from klausurarchiv.db import validate_schema
 
 
 class User(UserMixin):
+    """
+    A currently logged in user.
+
+    Possesses an unique id and mainly implements the UserMixin.
+    """
     def __init__(self, user_id: str):
         self.__user_id = user_id
 
@@ -14,6 +19,9 @@ class User(UserMixin):
 
 
 def init_app(app: Flask):
+    """
+    Initializes the application by exposing login and logout endpoints for authorization.
+    """
     login_manager = LoginManager()
 
     @login_manager.user_loader

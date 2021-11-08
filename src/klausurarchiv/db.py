@@ -1,3 +1,8 @@
+"""
+db.py
+========================
+Contains the logic for all API endpoints that access the underlying database.
+"""
 import datetime
 import importlib.resources as import_res
 import os
@@ -13,7 +18,27 @@ from werkzeug.utils import secure_filename
 
 
 class Archive(object):
+    """
+    The central object of the archive, which manages the database containing all the available resources.
+
+    Attributes
+    ----------
+    path: Path
+
+    db_path: Path
+
+    docs_path: Path
+
+    secret_path: Path
+
+    secret_key: bytes
+    """
     def __init__(self, path: Path):
+        """
+        Loads up the archive from a given path.
+
+        If path or subfolders for docs, database or the secret key do not yet exist, they will be created accordingly.
+        """
         self.__path: Path = Path(path)
         if not self.__path.exists():
             os.makedirs(path)
@@ -37,10 +62,16 @@ class Archive(object):
             self.secret_path.chmod(0o400)
 
     def commit(self):
+        """
+        Commits any changes to the database.
+        """
         self.db.commit()
 
     @property
     def secret_key(self) -> bytes:
+        """
+        Reads the secret key from the corresponding file.
+        """
         with open(self.secret_path, mode="rb") as file:
             return file.read()
 
@@ -68,6 +99,30 @@ class Archive(object):
 
 
 def validate_schema(schema: Dict, data: Dict, may_be_partial: bool = False):
+    """
+    Checks whether a given dictionary of data contains all the required keys with corresponding values of the right type.
+
+    Given some data in form of a dictionary, this function determines whether a given list of required keys corresponding to a specific type is contained. There may be cases where a only a subset of the schema is required and missing keys are allowed, but any combinations contradicting the given schema will result in an exception.
+
+    Parameters
+    ----------
+        schema: Dict
+            contains a mapping of attribute name to required type
+        data: Dict
+            data to be checked in form of a simple dictionary
+        may_be_partial: bool
+            determines whether part of the schema may be missing from the given data
+
+    Returns
+    -------
+        bool
+            True if data conforms to the schema, False otherwise.
+
+    Raises
+    ------
+    BadRequest
+        if data is empty, not a dictionary, misses a required attribute or has an attribute of a different type than required
+    """
     if data is None:
         raise BadRequest("Request body may not be empty")
     if not isinstance(data, Dict):
@@ -88,6 +143,14 @@ R = TypeVar('R', bound='Resource')
 
 
 class Resource(object):
+    """
+    Any kind of resource associated with a list of attributes, which is stored in the database and accessible via the public API.
+
+    Attributes
+    ----------
+    entry_id: int
+        numerical id corresponding to one unique resource
+    """
     ATTRIBUTE_SCHEMA = dict()
     TABLE_NAME = ""
     RESOURCE_PATH = ""
@@ -177,6 +240,19 @@ class Resource(object):
 
 
 class Document(Resource):
+    """
+    A downloadable file of specific type.
+
+    Attributes
+    ---------
+    filename: str
+        Filename of the document
+    downloadable: bool
+        TODO: "including unauthorized users" - kinda self-contradicting more like "not privileged users"
+        Whether the document is downloadable for all (including currently not logged in) users
+    content_type: str
+        The media type of the file. Allowed content types are specified in the protocol.
+    """
     ATTRIBUTE_SCHEMA = {
         "filename": str,
         "downloadable": bool,
@@ -276,6 +352,7 @@ class Document(Resource):
             self.content_type = data["content_type"]
 
     def delete(self):
+        """Deletes this resource from the database."""
         g.archive.db.execute("delete from Documents where ID=?", (self.entry_id,))
 
     def may_be_accessed(self) -> bool:
@@ -331,6 +408,16 @@ class Document(Resource):
 
 
 class Course(Resource):
+    """
+    A university course associated with a number of documents.
+
+    Attributes
+    ----------
+    long_name : str
+        Full name of the course
+    short_name : str
+        Abbreviated name for the course
+    """
     ATTRIBUTE_SCHEMA = {
         "long_name": str,
         "short_name": str
@@ -443,6 +530,15 @@ class Folder(Resource):
 
 
 class Author(Resource):
+    """Author associated with an item.
+
+    Attributes
+    ----------
+    entry_id: int
+        id of the author in the database
+    name: str
+        Name of the author
+    """
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
@@ -456,6 +552,7 @@ class Author(Resource):
 
     @property
     def dict(self) -> Dict:
+        """Returns a dictionary representation of an author, containing their name."""
         return {
             "name": self.name
         }
@@ -487,6 +584,24 @@ class Author(Resource):
 
 
 class Item(Resource):
+<<<<<<< Updated upstream
+    """A named collection of documents by a list of authors regarding a number of courses in a folder structure.
+
+    Attributes
+    ----------
+    entry_id: int
+        id of the item in the database
+    name: str
+        Name of this item
+    documents: List
+        List of documents associated with an item
+    courses: List
+        List of courses associated with an item
+    folders: List
+        List of folders associated with an item
+    visible: bool
+        Whether the item is visible to unauthorized users
+    """
     ATTRIBUTE_SCHEMA = {
         "name": str,
         # date is not included as it may be None and the normal check can't deal with that.
@@ -501,6 +616,22 @@ class Item(Resource):
 
     @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
+        """Checks whether the dictionary representation of an item results in a valid item.
+
+        Parameters
+        ----------
+        cls : type
+            Item type
+        data: Dict
+            dictionary mapping attribute names to their respective values
+        may_be_partial: bool, optional
+            Whether part of the attributes may be missing
+
+        Raises
+        ------
+        BadRequest
+            If date attribute is missing, not a string or not ISO-formatted or if one of the other attributes contains entries with invalid entry_id
+        """
         super(Item, cls).validate_data(data, may_be_partial)
 
         if "date" in data:
@@ -561,6 +692,7 @@ class Item(Resource):
 
     @property
     def dict(self):
+        """Returns a dictionary representation of an item, mapping the name of its attribute to its respective value."""
         return {
             "name": self.name,
             "date": self.date,
@@ -592,29 +724,35 @@ class Item(Resource):
 
     @property
     def name(self) -> str:
+        """Gets name attribute of first item from database with matching entry_id."""
         cursor = g.archive.db.execute("select name from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name: str):
+        """Updates the name attribute of all entries with maching entry_id."""
         g.archive.db.execute("update Items set name=? where ID=?", (new_name, self.entry_id))
 
     @property
     def date(self) -> Optional[str]:
+        """Gets date attribute of first item from database with matching entry_id."""
         cursor = g.archive.db.execute("select date from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
     @date.setter
     def date(self, new_date: Optional[str]):
+        """Updates the date attribute of all entries with maching entry_id."""
         g.archive.db.execute("update Items set date=? where ID=?", (new_date, self.entry_id))
 
     @property
     def documents(self) -> List[Document]:
+        """Returns a list of all documents associated with this item."""
         return [Document(int(row[0])) for row in
                 g.archive.db.execute("select DocumentID from ItemDocumentMap where ItemID=?", (self.entry_id,))]
 
     @documents.setter
     def documents(self, new_documents: List[Document]):
+        """Replaces the list of documents associated with this item with the given list of documents."""
         g.archive.db.execute("delete from ItemDocumentMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
@@ -623,11 +761,13 @@ class Item(Resource):
 
     @property
     def courses(self) -> List[Course]:
+        """Returns a list of all courses associated with this item."""
         return [Course(row[0]) for row in
                 g.archive.db.execute("select CourseID from ItemCourseMap where ItemID=?", (self.entry_id,))]
 
     @courses.setter
     def courses(self, new_courses: List[Course]):
+        """Replaces the list of courses associated with this item with the given list of courses."""
         g.archive.db.execute("delete from ItemCourseMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemCourseMap(ItemID, CourseID) values (?, ?)",
@@ -636,11 +776,13 @@ class Item(Resource):
 
     @property
     def authors(self) -> List[Author]:
+        """Returns a list of all authors associated with this item."""
         return [Author(row[0]) for row in
                 g.archive.db.execute("select AuthorID from ItemAuthorMap where ItemID=?", (self.entry_id,))]
 
     @authors.setter
     def authors(self, new_authors: List[Author]):
+        """Replaces the list of authors associated with this item with the given list of authors."""
         g.archive.db.execute("delete from ItemAuthorMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)",
@@ -649,11 +791,13 @@ class Item(Resource):
 
     @property
     def folders(self) -> List[Folder]:
+        """Returns a list of all folders associated with this item."""
         return [Folder(row[0]) for row in
                 g.archive.db.execute("select FolderID from ItemFolderMap where ItemID=?", (self.entry_id,))]
 
     @folders.setter
     def folders(self, new_folders: List[Folder]):
+        """Replaces the list of folders associated with this item with the given list of folders."""
         g.archive.db.execute("delete from ItemFolderMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemFolderMap(ItemID, FolderID) values (?, ?)",
@@ -662,19 +806,24 @@ class Item(Resource):
 
     @property
     def visible(self) -> bool:
+        """Fetches whether the visible attribute is set for this item."""
         cursor = g.archive.db.execute("select visible from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0] == 1
 
     @visible.setter
     def visible(self, new_visible: bool):
+        """Updates the visible attribute of this item to the given state."""
         new_visible = 1 if new_visible else 0
         g.archive.db.execute("update Items set visible=? where ID=?", (new_visible, self.entry_id))
 
     def __eq__(self, other: 'Item') -> bool:
+        """Checks whether entry_id is equal."""
         return self.entry_id == other.entry_id
 
     def __ne__(self, other: 'Item') -> bool:
+        """Checks whether entry_id is unequal."""
         return not self == other
 
     def __hash__(self) -> int:
+        """Computes hash of entry_id."""
         return hash(self.entry_id)
