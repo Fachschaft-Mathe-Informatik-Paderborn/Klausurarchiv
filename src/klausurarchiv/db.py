@@ -26,7 +26,7 @@ class Archive(object):
     path: Path
         path at which all resources are located
     db_path: Path
-
+        path to the database file
     docs_path: Path
         subfolder at which all documents are located
     secret_path: Path
@@ -39,6 +39,7 @@ class Archive(object):
         Initializes the archive from a given path.
 
         If path or subfolders for docs, database or the secret key do not yet exist, they will be created accordingly.
+        Secret key will be created as read-only, only available to the owner.
 
         Parameters
         ----------
@@ -73,30 +74,38 @@ class Archive(object):
 
     @property
     def secret_key(self) -> bytes:
-        """Reads the secret key from the corresponding file."""
+        """Reads the secret key from the corresponding file.
+
+        Will read the file each time instead of permanently storing the secret key."""
         with open(self.secret_path, mode="rb") as file:
             return file.read()
 
     @property
     def db_path(self) -> Path:
+        """The path to where the database is stored."""
         return self.__path / Path("archive.sqlite")
 
     @property
     def docs_path(self) -> Path:
+        """The path to where all documents are stored."""
         return self.__path / Path("docs")
 
     @property
     def secret_path(self) -> Path:
+        """The path to where the secret key is stored."""
         return self.__path / Path("SECRET")
 
     @property
     def path(self) -> Path:
+        """The path to where all of the archives files are stored."""
         return self.__path
 
     def __eq__(self, other: 'Archive') -> bool:
+        """Whether the path of two archives matches."""
         return self.path == other.path
 
     def __ne__(self, other: 'Archive') -> bool:
+        """Whether the path of two archives does not match."""
         return not self.path == other.path
 
 
@@ -243,7 +252,7 @@ class Resource(object):
 
 class Document(Resource):
     """
-    A downloadable file of specific type.
+    A file of specific media type that is stored on disk.
 
     Attributes
     ---------
@@ -482,6 +491,14 @@ class Course(Resource):
 
 
 class Folder(Resource):
+    """Representation of the physical folder an item may be found in.
+
+    Attributes
+    ----------
+    name: str
+        name of the folder
+
+    """
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
@@ -532,7 +549,7 @@ class Folder(Resource):
 
 
 class Author(Resource):
-    """Author associated with an item.
+    """Author responsible for a document.
 
     Attributes
     ----------
@@ -586,22 +603,23 @@ class Author(Resource):
 
 
 class Item(Resource):
-    """A named collection of documents by a list of authors regarding a number of courses in a folder structure.
+    """
+    A concrete lecture or exam consisting of multiple documents, that can be used to prepare for a number of courses.
 
     Attributes
     ----------
     entry_id: int
-        id of the item in the database
+        id of the item in the database.
     name: str
-        Name of this item
+        Name of the concrete lecture or exam.
     documents: List
-        List of documents associated with an item
+        List of documents associated with the item.
     courses: List
-        List of courses associated with an item
+        List of courses that the item can be used to prepare for.
     folders: List
-        List of folders associated with an item
+        physical folder(s) the item is available in.
     visible: bool
-        Whether the item is visible to unauthorized users
+        Whether the item is visible to unauthorized users.
     """
     ATTRIBUTE_SCHEMA = {
         "name": str,
