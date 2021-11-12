@@ -20,19 +20,6 @@ from werkzeug.utils import secure_filename
 class Archive(object):
     """
     The central object of the archive, which manages the database containing all the available resources.
-
-    Attributes
-    ----------
-    path: Path
-        path at which all resources are located
-    db_path: Path
-        path to the database file
-    docs_path: Path
-        subfolder at which all documents are located
-    secret_path: Path
-        subfolder at which the secret key is located (read-only)
-    secret_key: bytes
-        byte representation of the secret key
     """
     def __init__(self, path: Path):
         """
@@ -74,9 +61,12 @@ class Archive(object):
 
     @property
     def secret_key(self) -> bytes:
-        """Reads the secret key from the corresponding file.
+        """
+        The secret key.
 
-        Will read the file each time instead of permanently storing the secret key."""
+        :getter: Reads the secret key from the corresponding file. This will read the file each time instead of permanently storing the secret key.
+        :type: bytes
+        """
         with open(self.secret_path, mode="rb") as file:
             return file.read()
 
@@ -101,11 +91,11 @@ class Archive(object):
         return self.__path
 
     def __eq__(self, other: 'Archive') -> bool:
-        """Whether the path of two archives matches."""
+        """Checks whether the path of two archives matches."""
         return self.path == other.path
 
     def __ne__(self, other: 'Archive') -> bool:
-        """Whether the path of two archives does not match."""
+        """Checks whether the path of two archives does not match."""
         return not self.path == other.path
 
 
@@ -253,16 +243,6 @@ class Resource(object):
 class Document(Resource):
     """
     A file of specific media type that is stored on disk.
-
-    Attributes
-    ---------
-    filename: str
-        Filename of the document
-    downloadable: bool
-        TODO: "including unauthorized users" - kinda self-contradicting more like "not privileged users"
-        Whether the document is downloadable for all (including currently not logged in) users
-    content_type: str
-        The media type of the file. Allowed content types are specified in the protocol.
     """
     ATTRIBUTE_SCHEMA = {
         "filename": str,
@@ -378,6 +358,13 @@ class Document(Resource):
 
     @property
     def filename(self) -> str:
+        """
+        The filename of the document.
+
+        :getter: Gets filename attribute of first document from database with matching entry_id.
+        :setter: Updates the filename attribute of all document entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select filename from Documents where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -387,6 +374,13 @@ class Document(Resource):
 
     @property
     def content_type(self) -> str:
+        """
+        The content type of the document.
+
+        :getter: Gets content_type attribute of first document from database with matching entry_id.
+        :setter: Updates the content_type attribute of all document entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select content_type from Documents where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -396,6 +390,13 @@ class Document(Resource):
 
     @property
     def downloadable(self) -> bool:
+        """
+        Whether the document is downloadable by unauthorized users.
+
+        :getter: Fetches whether the downloadable attribute is set for this item.
+        :setter: Updates the downloadable attribute of this item to the given state.
+        :type: bool
+        """
         cursor = g.archive.db.execute("select downloadable from Documents where ID=?", (self.entry_id,))
         return cursor.fetchone()[0] == 1
 
@@ -406,28 +407,25 @@ class Document(Resource):
 
     @property
     def path(self) -> Path:
+        """The filepath where the document is stored."""
         return g.archive.docs_path / Path(str(self.entry_id))
 
     def __eq__(self, other: 'Document') -> bool:
+        """Checks whether the entry_id of two documents matches."""
         return self.entry_id == other.entry_id
 
     def __ne__(self, other: 'Document') -> bool:
+        """Checks whether the entry_id of two documents does not match."""
         return not self == other
 
     def __hash__(self) -> int:
+        """Computes the hash of the entry_id attribute."""
         return hash(self.entry_id)
 
 
 class Course(Resource):
     """
     A university course associated with a number of documents.
-
-    Attributes
-    ----------
-    long_name : str
-        Full name of the course
-    short_name : str
-        Abbreviated name for the course
     """
     ATTRIBUTE_SCHEMA = {
         "long_name": str,
@@ -464,6 +462,13 @@ class Course(Resource):
 
     @property
     def long_name(self) -> str:
+        """
+        The full name of the course.
+
+        :getter: Gets long_name attribute of first course from database with matching entry_id.
+        :setter: Updates the long_name attribute of all course entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select long_name from Courses where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -473,6 +478,13 @@ class Course(Resource):
 
     @property
     def short_name(self) -> str:
+        """
+        The abbreviated name of the course.
+
+        :getter: Gets short_name attribute of first course from database with matching entry_id.
+        :setter: Updates the short_name attribute of all course entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select short_name from Courses where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -481,24 +493,20 @@ class Course(Resource):
         g.archive.db.execute("update Courses set short_name=? where ID=?", (new_name, self.entry_id))
 
     def __eq__(self, other: 'Course') -> bool:
+        """Checks whether the entry_id of two courses matches."""
         return self.entry_id == other.entry_id
 
     def __ne__(self, other: 'Course') -> bool:
+        """Checks whether the entry_id of two courses does not match."""
         return not self == other
 
     def __hash__(self):
+        """Computes the hash of the entry_id attribute"""
         return hash(self.entry_id)
 
 
 class Folder(Resource):
-    """Representation of the physical folder an item may be found in.
-
-    Attributes
-    ----------
-    name: str
-        name of the folder
-
-    """
+    """Representation of the physical folder an item may be found in."""
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
@@ -530,6 +538,13 @@ class Folder(Resource):
 
     @property
     def name(self) -> str:
+        """
+        The name of the folder.
+
+        :getter: Gets name attribute of first folder from database with matching entry_id.
+        :setter: Updates the name attribute of all folder entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select name from Folders where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -538,13 +553,16 @@ class Folder(Resource):
         g.archive.db.execute("update Folders set name=? where ID=?", (new_name, self.entry_id))
 
     def __eq__(self, other: 'Folder'):
+        """Checks whether the entry_id of two folders matches."""
         is_equal = self.entry_id == other.entry_id
         return is_equal
 
     def __ne__(self, other: 'Folder'):
+        """Checks whether the entry_id of two folders does not match."""
         return not self == other
 
     def __hash__(self):
+        """Computes the has of the entry_id attribute."""
         return hash(self.entry_id)
 
 
@@ -555,8 +573,6 @@ class Author(Resource):
     ----------
     entry_id: int
         id of the author in the database
-    name: str
-        Name of the author
     """
     ATTRIBUTE_SCHEMA = {
         "name": str
@@ -571,7 +587,12 @@ class Author(Resource):
 
     @property
     def dict(self) -> Dict:
-        """Returns a dictionary representation of an author, containing their name."""
+        """
+        Dictionary representation of an author.
+
+        :getter: Returns a dictionary representation of an author, containing their name.
+        :type: Dict
+        """
         return {
             "name": self.name
         }
@@ -581,10 +602,18 @@ class Author(Resource):
             self.name = data["name"]
 
     def delete(self):
+        """Delete the author from the database."""
         g.archive.db.execute("delete from Authors where ID=?", (self.entry_id,))
 
     @property
     def name(self) -> str:
+        """
+        The name of the author
+
+        :getter: Gets name attribute of first author from database with matching entry_id.
+        :setter: Updates the name attribute of all author entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select name from Authors where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
@@ -593,12 +622,15 @@ class Author(Resource):
         g.archive.db.execute("update Authors set name=? where ID=?", (new_name, self.entry_id))
 
     def __eq__(self, other: 'Author'):
+        """Checks whether entry_id of two authors matches."""
         return self.entry_id == other.entry_id
 
     def __ne__(self, other: 'Author'):
+        """Checks whether entry_id of two authors does not mathc."""
         return not self == other
 
     def __hash__(self):
+        """Compute hash of entry_id attribute."""
         return hash(self.entry_id)
 
 
@@ -610,16 +642,6 @@ class Item(Resource):
     ----------
     entry_id: int
         id of the item in the database.
-    name: str
-        Name of the concrete lecture or exam.
-    documents: List
-        List of documents associated with the item.
-    courses: List
-        List of courses that the item can be used to prepare for.
-    folders: List
-        physical folder(s) the item is available in.
-    visible: bool
-        Whether the item is visible to unauthorized users.
     """
     ATTRIBUTE_SCHEMA = {
         "name": str,
@@ -710,8 +732,13 @@ class Item(Resource):
         return item
 
     @property
-    def dict(self):
-        """Returns a dictionary representation of an item, mapping the name of its attribute to its respective value."""
+    def dict(self) -> Dict:
+        """
+        Dictionary representation of the document.
+
+        :getter: Returns a dictionary representation of an item, mapping the name of its attribute to its respective value.
+        :type: Dict
+        """
         return {
             "name": self.name,
             "date": self.date,
@@ -739,39 +766,54 @@ class Item(Resource):
             self.visible = data["visible"]
 
     def delete(self):
+        """Deletes this item from the database."""
         g.archive.db.execute("delete from Items where ID=?", (self.entry_id,))
 
     @property
     def name(self) -> str:
-        """Gets name attribute of first item from database with matching entry_id."""
+        """
+        The name of an item.
+
+        :getter: Gets name attribute of first item from database with matching entry_id.
+        :setter: Updates the name attribute of all entries with maching entry_id.
+        :type: str
+        """
         cursor = g.archive.db.execute("select name from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
     @name.setter
     def name(self, new_name: str):
-        """Updates the name attribute of all entries with maching entry_id."""
         g.archive.db.execute("update Items set name=? where ID=?", (new_name, self.entry_id))
 
     @property
     def date(self) -> Optional[str]:
-        """Gets date attribute of first item from database with matching entry_id."""
+        """
+        The date an item was added.
+
+        :getter: Gets date attribute of first item from database with matching entry_id.
+        :setter: Updates the date attribute of all entries with maching entry_id in the database.
+        :type: str, optional
+        """
         cursor = g.archive.db.execute("select date from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0]
 
     @date.setter
     def date(self, new_date: Optional[str]):
-        """Updates the date attribute of all entries with maching entry_id."""
         g.archive.db.execute("update Items set date=? where ID=?", (new_date, self.entry_id))
 
     @property
     def documents(self) -> List[Document]:
-        """Returns a list of all documents associated with this item."""
+        """
+        A list of associated documents.
+
+        :getter: Returns a list of all documents associated with this item.
+        :setter: Replaces the list of documents associated with this item with the given list of documents
+        :type: List of :py:class:`Document`"""
         return [Document(int(row[0])) for row in
                 g.archive.db.execute("select DocumentID from ItemDocumentMap where ItemID=?", (self.entry_id,))]
 
     @documents.setter
     def documents(self, new_documents: List[Document]):
-        """Replaces the list of documents associated with this item with the given list of documents."""
         g.archive.db.execute("delete from ItemDocumentMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemDocumentMap(ItemID, DocumentID) values (?, ?)",
@@ -780,13 +822,18 @@ class Item(Resource):
 
     @property
     def courses(self) -> List[Course]:
-        """Returns a list of all courses associated with this item."""
+        """
+        A list of associated courses.
+
+        :getter: Returns a list of all courses associated with this item.
+        :setter: Replaces the list of courses associated with this item with the given list of courses.
+        :type: List of :py:class:`Course`
+        """
         return [Course(row[0]) for row in
                 g.archive.db.execute("select CourseID from ItemCourseMap where ItemID=?", (self.entry_id,))]
 
     @courses.setter
     def courses(self, new_courses: List[Course]):
-        """Replaces the list of courses associated with this item with the given list of courses."""
         g.archive.db.execute("delete from ItemCourseMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemCourseMap(ItemID, CourseID) values (?, ?)",
@@ -795,13 +842,18 @@ class Item(Resource):
 
     @property
     def authors(self) -> List[Author]:
-        """Returns a list of all authors associated with this item."""
+        """
+        A list of responsible authors.
+
+        :getter: Returns a list of all authors associated with this item.
+        :setter: Replaces the list of authors associated with this item with the given list of authors.
+        :type: List of :py:class:`Author`
+        """
         return [Author(row[0]) for row in
                 g.archive.db.execute("select AuthorID from ItemAuthorMap where ItemID=?", (self.entry_id,))]
 
     @authors.setter
     def authors(self, new_authors: List[Author]):
-        """Replaces the list of authors associated with this item with the given list of authors."""
         g.archive.db.execute("delete from ItemAuthorMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemAuthorMap(ItemID, AuthorID) values (?, ?)",
@@ -810,13 +862,18 @@ class Item(Resource):
 
     @property
     def folders(self) -> List[Folder]:
-        """Returns a list of all folders associated with this item."""
+        """
+        A list of (physical) folders an item resides in.
+
+        :getter: Returns a list of all folders associated with this item.
+        :setter: Replaces the list of folders associated with this item with the given list of folders.
+        :type: List of :py:class:`Folder`
+        """
         return [Folder(row[0]) for row in
                 g.archive.db.execute("select FolderID from ItemFolderMap where ItemID=?", (self.entry_id,))]
 
     @folders.setter
     def folders(self, new_folders: List[Folder]):
-        """Replaces the list of folders associated with this item with the given list of folders."""
         g.archive.db.execute("delete from ItemFolderMap where ItemID=?", (self.entry_id,))
         g.archive.db.executemany(
             "insert into ItemFolderMap(ItemID, FolderID) values (?, ?)",
@@ -825,24 +882,28 @@ class Item(Resource):
 
     @property
     def visible(self) -> bool:
-        """Fetches whether the visible attribute is set for this item."""
+        """
+        Whether the item is visible to unauthorized users.
+        :getter: Fetches whether the visible attribute is set for this item.
+        :setter: Updates the visible attribute of this item to the given state.
+        :type: bool
+        """
         cursor = g.archive.db.execute("select visible from Items where ID=?", (self.entry_id,))
         return cursor.fetchone()[0] == 1
 
     @visible.setter
     def visible(self, new_visible: bool):
-        """Updates the visible attribute of this item to the given state."""
         new_visible = 1 if new_visible else 0
         g.archive.db.execute("update Items set visible=? where ID=?", (new_visible, self.entry_id))
 
     def __eq__(self, other: 'Item') -> bool:
-        """Checks whether entry_id is equal."""
+        """Checks whether attribute entry_id is equal."""
         return self.entry_id == other.entry_id
 
     def __ne__(self, other: 'Item') -> bool:
-        """Checks whether entry_id is unequal."""
+        """Checks whether attribute entry_id is unequal."""
         return not self == other
 
     def __hash__(self) -> int:
-        """Computes hash of entry_id."""
+        """Computes hash of attribute entry_id."""
         return hash(self.entry_id)
