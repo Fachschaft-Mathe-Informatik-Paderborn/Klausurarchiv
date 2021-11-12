@@ -9,3 +9,5 @@ pages:
     paths:
       - public
   when: manual
+  tags:
+    - shared
