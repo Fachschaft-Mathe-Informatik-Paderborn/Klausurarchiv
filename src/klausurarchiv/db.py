@@ -230,7 +230,7 @@ class Document(Resource):
 
             # Check if the document belongs to an invisible item or is not downloadable.
             # If so, it may not be downloaded.
-            if not doc.may_be_accessed():
+            if not doc.may_be_downloaded():
                 raise Unauthorized("You are not allowed to download this document")
 
             return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
@@ -239,13 +239,13 @@ class Document(Resource):
     def get_entries(cls: R) -> List[R]:
         entries: List['Document'] = super(Document, cls).get_entries()
         if not current_user.is_authenticated:
-            entries = [entry for entry in entries if entry.may_be_accessed()]
+            entries = [entry for entry in entries if entry.visible]
         return entries
 
     @classmethod
     def get_entry(cls: R, entry_id: int) -> Optional[R]:
         entry: 'Document' = super(Document, cls).get_entry(entry_id)
-        if not entry.may_be_accessed():
+        if not entry.visible:
             raise Unauthorized("You are not allowed to access this resource")
         return entry
 
@@ -278,15 +278,17 @@ class Document(Resource):
     def delete(self):
         g.archive.db.execute("delete from Documents where ID=?", (self.entry_id,))
 
-    def may_be_accessed(self) -> bool:
-        if current_user.is_authenticated:
-            return True
+    @property
+    def visible(self) -> bool:
         cursor = g.archive.db.execute("""
-                select count(Items.ID)
-                from Items inner join (select * from ItemDocumentMap where DocumentID = ?) IDM on Items.ID = IDM.ItemID
-                where Items.visible=0
-            """, (self.entry_id,))
-        return cursor.fetchone()[0] == 0 and self.downloadable
+            select count(Items.ID)
+            from Items inner join (select * from ItemDocumentMap where DocumentID = ?) IDM on Items.ID == IDM.ItemID
+            where Items.visible=0
+        """, (self.entry_id,))
+        return cursor.fetchone()[0] == 0 or current_user.is_authenticated
+
+    def may_be_downloaded(self) -> bool:
+        return current_user.is_authenticated or (self.visible and self.downloadable)
 
     @property
     def filename(self) -> str:
