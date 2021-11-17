@@ -208,38 +208,35 @@ class Document(Resource):
                 raise BadRequest("Parameter id is required")
             except ValueError:
                 raise BadRequest("Parameter id must be an integer")
-            return Document.get_entry(doc_id)
+            doc = Document.get_entry(doc_id)
+            if doc is None:
+                raise NotFound("Illegal document id")
+            return doc
 
         @app.post("/v1/upload")
         @login_required
         def upload_document():
             doc = get_requested_document()
 
-            if doc is not None:
-                if request.content_type != doc.content_type:
-                    raise BadRequest("Illegal document type")
-                if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
-                    raise RequestEntityTooLarge()
-                with open(doc.path, mode="wb") as file:
-                    file.write(request.get_data())
+            if request.content_type != doc.content_type:
+                raise BadRequest("Illegal document type")
+            if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+                raise RequestEntityTooLarge()
+            with open(doc.path, mode="wb") as file:
+                file.write(request.get_data())
 
-                return make_response({})
-            else:
-                return None
+            return make_response({})
 
         @app.get("/v1/download")
         def download_document():
             doc = get_requested_document()
 
-            if doc is not None:
-                # Check if the document belongs to an invisible item or is not downloadable.
-                # If so, it may not be downloaded.
-                if not doc.may_be_downloaded():
-                    raise Unauthorized("You are not allowed to download this document")
+            # Check if the document belongs to an invisible item or is not downloadable.
+            # If so, it may not be downloaded.
+            if not doc.may_be_downloaded():
+                raise Unauthorized("You are not allowed to download this document")
 
-                return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
-            else:
-                return None
+            return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
 
     @classmethod
     def get_entries(cls: R) -> List[R]:
