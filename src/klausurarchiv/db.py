@@ -79,8 +79,12 @@ def validate_schema(schema: Dict, data: Dict, may_be_partial: bool = False):
             else:
                 raise BadRequest(f"Attribute \"{attribute_name}\" is missing")
         if not isinstance(data[attribute_name], attribute_type):
+            try:
+                typename = attribute_type.__name__
+            except AttributeError:
+                typename = attribute_type._name
             raise BadRequest(
-                f"Attribute \"{attribute_name}\" must be of type \"{attribute_type.__name__}\""
+                f"Attribute \"{attribute_name}\" must be of type \"{typename}\""
             )
 
 
