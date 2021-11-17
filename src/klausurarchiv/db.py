@@ -215,25 +215,31 @@ class Document(Resource):
         def upload_document():
             doc = get_requested_document()
 
-            if request.content_type != doc.content_type:
-                raise BadRequest("Illegal document type")
-            if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
-                raise RequestEntityTooLarge()
-            with open(doc.path, mode="wb") as file:
-                file.write(request.get_data())
+            if doc is not None:
+                if request.content_type != doc.content_type:
+                    raise BadRequest("Illegal document type")
+                if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+                    raise RequestEntityTooLarge()
+                with open(doc.path, mode="wb") as file:
+                    file.write(request.get_data())
 
-            return make_response({})
+                return make_response({})
+            else:
+                return None
 
         @app.get("/v1/download")
         def download_document():
             doc = get_requested_document()
 
-            # Check if the document belongs to an invisible item or is not downloadable.
-            # If so, it may not be downloaded.
-            if not doc.may_be_downloaded():
-                raise Unauthorized("You are not allowed to download this document")
+            if doc is not None:
+                # Check if the document belongs to an invisible item or is not downloadable.
+                # If so, it may not be downloaded.
+                if not doc.may_be_downloaded():
+                    raise Unauthorized("You are not allowed to download this document")
 
-            return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
+                return send_file(doc.path, mimetype=doc.content_type, as_attachment=True, download_name=doc.filename)
+            else:
+                return None
 
     @classmethod
     def get_entries(cls: R) -> List[R]:
