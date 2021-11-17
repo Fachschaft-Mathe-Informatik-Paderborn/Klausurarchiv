@@ -245,7 +245,7 @@ class Document(Resource):
     @classmethod
     def get_entry(cls: R, entry_id: int) -> Optional[R]:
         entry: 'Document' = super(Document, cls).get_entry(entry_id)
-        if not entry.visible:
+        if entry is not None and not entry.visible:
             raise Unauthorized("You are not allowed to access this resource")
         return entry
 
@@ -545,7 +545,7 @@ class Item(Resource):
     @classmethod
     def get_entry(cls: R, entry_id: int) -> Optional[R]:
         entry: 'Item' = super(Item, cls).get_entry(entry_id)
-        if current_user.is_authenticated or entry.visible:
+        if entry is not None and (current_user.is_authenticated or entry.visible):
             return entry
         else:
             return None
