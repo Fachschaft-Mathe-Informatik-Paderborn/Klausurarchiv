@@ -3,7 +3,7 @@ import importlib.resources as import_res
 import os
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Dict, Type, TypeVar
+from typing import List, Optional, Dict, Type, TypeVar, Tuple
 
 from flask import Flask, request, send_file
 from flask import g, make_response, Response
@@ -25,6 +25,7 @@ class Archive(object):
         # Check database
         database_exists = self.db_path.exists()
         self.db: sqlite3.Connection = sqlite3.connect(self.db_path)
+        self.db.row_factory = sqlite3.Row
         if not database_exists:
             import klausurarchiv
             with import_res.open_text(klausurarchiv, "schema.sql") as f:
@@ -96,25 +97,12 @@ class Resource(object):
     TABLE_NAME = ""
     RESOURCE_PATH = ""
 
-    def __init__(self, entry_id: int):
-        self.__entry_id: int = int(entry_id)
-
-    @property
-    def entry_id(self) -> int:
-        return self.__entry_id
-
     @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
         validate_schema(cls.ATTRIBUTE_SCHEMA, data, may_be_partial)
 
     @classmethod
     def register_resource(cls, app: Flask):
-        def get_entry(entry_id: int) -> Resource:
-            entry = cls.get_entry(entry_id)
-            if entry is None:
-                raise NotFound("The requested resource does not exist")
-            return entry
-
         def commit_and_make_response(data: Dict, status=200) -> Response:
             response = make_response(data, status)
             g.archive.commit()
@@ -122,62 +110,70 @@ class Resource(object):
 
         @app.get(f"{cls.RESOURCE_PATH}", endpoint=f"GET {cls.RESOURCE_PATH}", strict_slashes=False)
         def get_all():
-            return make_response({
-                entry.entry_id: entry.dict
-                for entry in cls.get_entries()
-            })
+            return make_response(cls.get_all())
 
         @app.get(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"GET {cls.RESOURCE_PATH}/id")
         def get(entry_id: int):
-            return make_response(cls.get_entry(entry_id).dict)
+            return make_response(cls.get(entry_id))
 
         @app.post(f"{cls.RESOURCE_PATH}", endpoint=f"POST {cls.RESOURCE_PATH}", strict_slashes=False)
         @login_required
         def post():
             data = request.get_json()
             cls.validate_data(data)
-            entry = cls.new_entry(data)
-            return commit_and_make_response({"id": entry.entry_id}, 201)
+            entry_id = cls.post(data)
+            return commit_and_make_response({"id": entry_id}, 201)
 
         @app.patch(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"PATCH {cls.RESOURCE_PATH}/id")
         @login_required
         def patch(entry_id: int):
             data = request.get_json()
             cls.validate_data(data, may_be_partial=True)
-            get_entry(entry_id).update(data)
+            cls.patch(entry_id, data)
             return commit_and_make_response({})
 
         @app.delete(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"DELETE {cls.RESOURCE_PATH}/id")
         @login_required
         def delete(entry_id: int):
-            get_entry(entry_id).delete()
+            cls.delete(entry_id)
             return commit_and_make_response({})
 
     @classmethod
-    def get_entries(cls: Type[R]) -> List[R]:
-        return [cls(entry_id[0]) for entry_id in g.archive.db.execute(f"select ID from {cls.TABLE_NAME}")]
-
-    @classmethod
-    def get_entry(cls: Type[R], entry_id: int) -> Optional[R]:
-        cursor = g.archive.db.execute(f"select count(ID) from {cls.TABLE_NAME} where ID = ?", (entry_id,))
-        if cursor.fetchone()[0] == 1:
-            return cls(entry_id)
+    def get(cls, entry_id: int) -> Dict:
+        row = g.archive.db.execute(f"select * from {cls.TABLE_NAME} where ID=?", (entry_id,)).fetchone()
+        row = cls.process_row(dict(row))
+        if row is None:
+            raise NotFound
         else:
-            return None
+            return row
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Resource':
+    def get_all(cls) -> Dict[int, Dict]:
+        return {
+            entry_id: row
+            for entry_id, row in map(
+                lambda row: (row["ID"], cls.process_row(dict(row))),
+                g.archive.db.execute(f"select * from {cls.TABLE_NAME}")
+            )
+            if row is not None
+        }
+
+    @classmethod
+    def process_row(cls, raw_row: Dict) -> Optional[Dict]:
+        del raw_row["ID"]
+        return raw_row
+
+    @classmethod
+    def post(cls, data: Dict) -> int:
         raise NotImplementedError
 
-    @property
-    def dict(self) -> Dict:
+    @classmethod
+    def patch(cls, entry_id: int, data: Dict):
         raise NotImplementedError
 
-    def update(self, data: Dict):
-        raise NotImplementedError
-
-    def delete(self):
-        raise NotImplementedError
+    @classmethod
+    def delete(cls, entry_id: int):
+        g.archive.db.execute(f"delete from {cls.TABLE_NAME} where ID=?", (entry_id,))
 
 
 class Document(Resource):
@@ -257,7 +253,7 @@ class Document(Resource):
         return entry
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Document':
+    def post(cls, data: Dict) -> 'Document':
         cls.validate_data(data)
         cursor = g.archive.db.execute(
             "insert into Documents(filename, downloadable, content_type) values (?, ?, ?)",
@@ -266,14 +262,14 @@ class Document(Resource):
         return Document(cursor.lastrowid)
 
     @property
-    def dict(self) -> Dict:
+    def get(self) -> Dict:
         return {
             "filename": self.filename,
             "downloadable": self.downloadable,
             "content_type": self.content_type
         }
 
-    def update(self, data: Dict):
+    def patch(self, data: Dict):
         self.validate_data(data, may_be_partial=True)
         if "filename" in data:
             self.filename = data["filename"]
@@ -348,57 +344,21 @@ class Course(Resource):
     RESOURCE_PATH = "/v1/courses"
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Course':
-        cls.validate_data(data)
+    def post(cls, data: Dict) -> int:
         cursor = g.archive.db.execute(
             "insert into Courses(long_name, short_name) values (?, ?)",
             (data["long_name"], data["short_name"])
         )
-        return Course(cursor.lastrowid)
+        return cursor.lastrowid
 
-    @property
-    def dict(self) -> Dict:
-        return {
-            "long_name": self.long_name,
-            "short_name": self.short_name
-        }
-
-    def update(self, data: Dict):
-        self.validate_data(data, may_be_partial=True)
-        if "long_name" in data:
-            self.long_name = data["long_name"]
-        if "short_name" in data:
-            self.short_name = data["short_name"]
-
-    def delete(self):
-        g.archive.db.execute("delete from Courses where ID=?", (self.entry_id,))
-
-    @property
-    def long_name(self) -> str:
-        cursor = g.archive.db.execute("select long_name from Courses where ID=?", (self.entry_id,))
-        return cursor.fetchone()[0]
-
-    @long_name.setter
-    def long_name(self, new_name):
-        g.archive.db.execute("update Courses set long_name=? where ID=?", (new_name, self.entry_id))
-
-    @property
-    def short_name(self) -> str:
-        cursor = g.archive.db.execute("select short_name from Courses where ID=?", (self.entry_id,))
-        return cursor.fetchone()[0]
-
-    @short_name.setter
-    def short_name(self, new_name):
-        g.archive.db.execute("update Courses set short_name=? where ID=?", (new_name, self.entry_id))
-
-    def __eq__(self, other: 'Course') -> bool:
-        return self.entry_id == other.entry_id
-
-    def __ne__(self, other: 'Course') -> bool:
-        return not self == other
-
-    def __hash__(self):
-        return hash(self.entry_id)
+    @classmethod
+    def patch(cls, entry_id: int, new_data: Dict):
+        data = cls.get(entry_id)
+        data.update(new_data)
+        g.archive.db.execute(
+            "update Courses set long_name=?, short_name=? where ID=?",
+            (data["long_name"], data["short_name"], entry_id)
+        )
 
 
 class Folder(Resource):
@@ -409,46 +369,18 @@ class Folder(Resource):
     RESOURCE_PATH = "/v1/folders"
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Folder':
-        cls.validate_data(data)
+    def post(cls, data: Dict) -> 'Folder':
         cursor = g.archive.db.execute(
             "insert into Folders(name) values (?)",
             (data["name"],)
         )
-        return Folder(cursor.lastrowid)
+        return cursor.lastrowid
 
-    @property
-    def dict(self) -> Dict:
-        return {
-            "name": self.name
-        }
-
-    def update(self, data: Dict):
-        self.validate_data(data, may_be_partial=True)
-        if "name" in data:
-            self.name = data["name"]
-
-    def delete(self):
-        g.archive.db.execute("delete from Folders where ID=?", (self.entry_id,))
-
-    @property
-    def name(self) -> str:
-        cursor = g.archive.db.execute("select name from Folders where ID=?", (self.entry_id,))
-        return cursor.fetchone()[0]
-
-    @name.setter
-    def name(self, new_name):
-        g.archive.db.execute("update Folders set name=? where ID=?", (new_name, self.entry_id))
-
-    def __eq__(self, other: 'Folder'):
-        is_equal = self.entry_id == other.entry_id
-        return is_equal
-
-    def __ne__(self, other: 'Folder'):
-        return not self == other
-
-    def __hash__(self):
-        return hash(self.entry_id)
+    @classmethod
+    def patch(cls, entry_id: int, new_data: Dict):
+        data = cls.get(entry_id)
+        data.update(new_data)
+        g.archive.db.execute("update Folders set name=? where ID=?", (data["name"], entry_id))
 
 
 class Author(Resource):
@@ -459,40 +391,15 @@ class Author(Resource):
     RESOURCE_PATH = "/v1/authors"
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Author':
+    def post(cls, data: Dict) -> int:
         cursor = g.archive.db.execute("insert into Authors(name) values (?)", (data["name"],))
-        return Author(cursor.lastrowid)
+        return cursor.lastrowid
 
-    @property
-    def dict(self) -> Dict:
-        return {
-            "name": self.name
-        }
-
-    def update(self, data: Dict):
-        if "name" in data:
-            self.name = data["name"]
-
-    def delete(self):
-        g.archive.db.execute("delete from Authors where ID=?", (self.entry_id,))
-
-    @property
-    def name(self) -> str:
-        cursor = g.archive.db.execute("select name from Authors where ID=?", (self.entry_id,))
-        return cursor.fetchone()[0]
-
-    @name.setter
-    def name(self, new_name):
-        g.archive.db.execute("update Authors set name=? where ID=?", (new_name, self.entry_id))
-
-    def __eq__(self, other: 'Author'):
-        return self.entry_id == other.entry_id
-
-    def __ne__(self, other: 'Author'):
-        return not self == other
-
-    def __hash__(self):
-        return hash(self.entry_id)
+    @classmethod
+    def patch(cls, entry_id: int, new_data: Dict):
+        data = cls.get(entry_id)
+        data.update(**new_data)
+        g.archive.db.execute("update Authors set name=? where ID=?", (data["name"], entry_id))
 
 
 class Item(Resource):
@@ -558,7 +465,7 @@ class Item(Resource):
             return None
 
     @classmethod
-    def new_entry(cls, data: Dict) -> 'Item':
+    def post(cls, data: Dict) -> 'Item':
         cursor = g.archive.db.execute("insert into Items(name, date, visible) values (?, ?, ?)",
                                       (data["name"], data["date"], data["visible"]))
         item = Item(cursor.lastrowid)
@@ -569,7 +476,7 @@ class Item(Resource):
         return item
 
     @property
-    def dict(self):
+    def get(self):
         return {
             "name": self.name,
             "date": self.date,
@@ -580,7 +487,7 @@ class Item(Resource):
             "visible": self.visible
         }
 
-    def update(self, data: Dict):
+    def patch(self, data: Dict):
         if "name" in data:
             self.name = data["name"]
         if "date" in data:
