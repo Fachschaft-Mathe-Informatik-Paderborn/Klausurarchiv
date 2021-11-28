@@ -66,4 +66,13 @@ CREATE TABLE IF NOT EXISTS "ItemFolderMap" (
 	FOREIGN KEY("ItemID") REFERENCES "Items"("ID") ON DELETE CASCADE ,
 	PRIMARY KEY("ItemID","FolderID")
 );
+CREATE VIEW IF NOT EXISTS VisibleItems as
+select * from Items where visible = 1;
+CREATE VIEW IF NOT EXISTS VisibleDocuments as
+select * from Documents where ID in (
+	select IDM.DocumentID
+	from ItemDocumentMap as IDM
+	inner join VisibleItems as Items
+	on IDM.ItemID == Items.ID
+);
 COMMIT;
