@@ -2,8 +2,9 @@ import datetime
 import importlib.resources as import_res
 import os
 import sqlite3
+from itertools import groupby
 from pathlib import Path
-from typing import List, Optional, Dict, Type, TypeVar, Tuple
+from typing import List, Optional, Dict, TypeVar
 
 from flask import Flask, request, send_file
 from flask import g, make_response, Response
@@ -377,48 +378,75 @@ class Item(Resource):
         validate_attribute("Folders", "folders")
 
     @classmethod
+    def get_all(cls) -> Dict[int, Dict]:
+        items = super(cls, Item).get_all()
+
+        def set_attribute(attribute_name: str, table_name: str, column_name: str):
+            # Initializing, so every attribute is at least empty
+            for item_id in items.keys():
+                items[item_id][attribute_name] = []
+
+            cursor = g.archive.db.execute(
+                f"""select Items.ID as ItemID, Map.{column_name} as {column_name}
+                    from Items left join {table_name} as Map on Items.ID = Map.ItemID
+                    order by ItemID"""
+            )
+            for item_id, rows in groupby(cursor, lambda row: row["ItemID"]):
+                if item_id in items:
+                    attribute_list = [row[column_name] for row in rows]
+                    if attribute_list == [None]:
+                        items[item_id][attribute_name] = []
+                    else:
+                        items[item_id][attribute_name] = attribute_list
+
+        set_attribute("documents", "ItemDocumentMap", "DocumentID")
+        set_attribute("authors", "ItemAuthorMap", "AuthorID")
+        set_attribute("courses", "ItemCourseMap", "CourseID")
+        set_attribute("folders", "ItemFolderMap", "FolderID")
+        return items
+
+    @classmethod
+    def get(cls, entity_id: int) -> Dict:
+        item = super(cls, Item).get(entity_id)
+
+        def set_attribute(attribute_name: str, table_name: str, column_name: str):
+            cursor = g.archive.db.execute(f"select {column_name} from {table_name} where ItemID=?", (entity_id,))
+            item[attribute_name] = [row[column_name] for row in cursor]
+
+        set_attribute("documents", "ItemDocumentMap", "DocumentID")
+        set_attribute("authors", "ItemAuthorMap", "AuthorID")
+        set_attribute("courses", "ItemCourseMap", "CourseID")
+        set_attribute("folders", "ItemFolderMap", "FolderID")
+        return item
+
+    @classmethod
+    def insert_attributes(cls, item_id: int, data: Dict, cleanup: bool = False):
+        attribute_triples = [
+            ("ItemDocumentMap", "DocumentID", data["documents"]),
+            ("ItemAuthorMap", "AuthorID", data["authors"]),
+            ("ItemCourseMap", "CourseID", data["courses"]),
+            ("ItemFolderMap", "FolderID", data["folders"]),
+        ]
+        for (table_name, target_column, target_ids) in attribute_triples:
+            if cleanup:
+                g.archive.db.execute(f"delete from {table_name} where ItemID=?", (item_id,))
+            g.archive.db.executemany(
+                f"insert into {table_name}(ItemID, {target_column}) values (?, ?)",
+                ((item_id, target_id) for target_id in target_ids)
+            )
+
+    @classmethod
     def post(cls, data: Dict) -> 'Item':
         cursor = g.archive.db.execute("insert into Items(name, date, visible) values (?, ?, ?)",
                                       (data["name"], data["date"], data["visible"]))
         item_id = cursor.lastrowid
-
-        attribute_triples = [
-            ("ItemDocumentMap(ItemID, DocumentID)", data["documents"]),
-            ("ItemAuthorMap(ItemID, AuthorID)", data["authors"]),
-            ("ItemCourseMap(ItemID, CourseID)", data["courses"]),
-            ("ItemFolderMap(ItemID, FolderID)", data["folder"]),
-        ]
-        for (table_definition, target_ids) in attribute_triples:
-            g.archive.db.executemany(
-                f"insert into {table_definition} values (?, ?)",
-                ((item_id, target_id) for target_id in target_ids)
-            )
+        cls.insert_attributes(item_id, data)
         return item_id
 
-    @property
-    def get(self):
-        return {
-            "name": self.name,
-            "date": self.date,
-            "documents": [document.entry_id for document in self.documents],
-            "authors": [author.entry_id for author in self.authors],
-            "courses": [course.entry_id for course in self.courses],
-            "folders": [folder.entry_id for folder in self.folders],
-            "visible": self.visible
-        }
-
-    def patch(self, data: Dict):
-        if "name" in data:
-            self.name = data["name"]
-        if "date" in data:
-            self.date = data["date"]
-        if "documents" in data:
-            self.documents = [Document(entry_id) for entry_id in data["documents"]]
-        if "authors" in data:
-            self.authors = [Author(entry_id) for entry_id in data["authors"]]
-        if "courses" in data:
-            self.courses = [Course(entry_id) for entry_id in data["courses"]]
-        if "folders" in data:
-            self.folders = [Folder(entry_id) for entry_id in data["folders"]]
-        if "visible" in data:
-            self.visible = data["visible"]
+    @classmethod
+    def patch(cls, entry_id: int, new_data: Dict):
+        data = cls.get(entry_id)
+        data.update(new_data)
+        g.archive.db.execute("update Items set name=?, date=?, visible=? where ID=?",
+                             (data["name"], data["date"], data["visible"], entry_id))
+        cls.insert_attributes(entry_id, data, cleanup=True)
