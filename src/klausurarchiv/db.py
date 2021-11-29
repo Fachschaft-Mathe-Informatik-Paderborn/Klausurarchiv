@@ -387,11 +387,7 @@ class Item(Resource):
             for item_id in items.keys():
                 items[item_id][attribute_name] = []
 
-            cursor = g.archive.db.execute(
-                f"""select Items.ID as ItemID, Map.{column_name} as {column_name}
-                    from Items left join {table_name} as Map on Items.ID = Map.ItemID
-                    order by ItemID"""
-            )
+            cursor = g.archive.db.execute(f"select * from {table_name} order by ItemID")
             for item_id, rows in groupby(cursor, lambda row: row["ItemID"]):
                 if item_id in items:
                     attribute_list = [row[column_name] for row in rows]
@@ -400,10 +396,10 @@ class Item(Resource):
                     else:
                         items[item_id][attribute_name] = attribute_list
 
-        set_attribute("documents", "ItemDocumentMap", "DocumentID")
-        set_attribute("authors", "ItemAuthorMap", "AuthorID")
-        set_attribute("courses", "ItemCourseMap", "CourseID")
-        set_attribute("folders", "ItemFolderMap", "FolderID")
+        set_attribute("documents", "JoinedItemDocumentMap", "DocumentID")
+        set_attribute("authors", "JoinedItemAuthorMap", "AuthorID")
+        set_attribute("courses", "JoinedItemCourseMap", "CourseID")
+        set_attribute("folders", "JoinedItemFolderMap", "FolderID")
         return items
 
     @classmethod
