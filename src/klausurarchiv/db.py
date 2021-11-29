@@ -197,6 +197,10 @@ class Document(Resource):
     RESOURCE_PATH = "/v1/documents"
 
     @classmethod
+    def path(cls, entry_id) -> Path:
+        return g.archive.docs_path / Path(str(entry_id))
+
+    @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
         super(Document, cls).validate_data(data, may_be_partial)
         allowed_content_types = [
@@ -217,13 +221,12 @@ class Document(Resource):
         def upload_document():
             entry_id = int(request.args["id"])
             doc = cls.get(entry_id)
-            path = g.archive.docs_path / Path(str(entry_id))
 
             if request.content_type != doc["content_type"]:
                 raise BadRequest("Illegal document type")
             if request.content_length > app.config["MAX_CONTENT_LENGTH"]:
                 raise RequestEntityTooLarge()
-            with open(path, mode="wb") as file:
+            with open(cls.path(entry_id), mode="wb") as file:
                 file.write(request.get_data())
 
             return make_response({})
@@ -232,14 +235,13 @@ class Document(Resource):
         def download_document():
             entry_id = int(request.args["id"])
             doc = cls.get(entry_id)
-            path = g.archive.docs_path / Path(str(entry_id))
 
             # Check if the document belongs to an invisible item or is not downloadable.
             # If so, it may not be downloaded.
             if not current_user.is_authenticated and not doc["downloadable"]:
                 raise Unauthorized("You are not allowed to download this document")
 
-            return send_file(path, mimetype=doc["content_type"], as_attachment=True, download_name=doc["filename"])
+            return send_file(cls.path(entry_id), mimetype=doc["content_type"], as_attachment=True, download_name=doc["filename"])
 
     @classmethod
     def post(cls, data: Dict) -> int:
@@ -257,6 +259,11 @@ class Document(Resource):
             "update Documents set filename=?, downloadable=?, content_type=? where ID=?",
             (data["filename"], data["downloadable"], data["content_type"], entry_id)
         )
+
+    @classmethod
+    def delete(cls, entry_id: int):
+        super(Document, cls).delete(entry_id)
+        cls.path(entry_id).unlink(missing_ok=True)
 
 
 class Course(Resource):
