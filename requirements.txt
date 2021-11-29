@@ -5,3 +5,5 @@ werkzeug~=2.0.1
 click~=8.0.1
 flask_login
 coverage
+tqdm
+requests

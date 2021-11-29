@@ -3,10 +3,11 @@
 # and sends it's metadata to an instance of the new system.
 # It does not send the actual documents, since we were not absolutely sure that the system as safe
 # at the time of this writing.
-import requests
-from pathlib import Path
-from tqdm import tqdm
 from itertools import chain
+from pathlib import Path
+
+import requests
+from tqdm import tqdm
 
 SERVER = "https://my.domain/"
 USER = "user"
@@ -29,7 +30,7 @@ for folder_path in (OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir():
         stem = item_path.stem
 
         (course, date, filename, _, authors) = stem.split(" - ")
-        
+
         name_dict[stem] = course
         course_dict[stem] = course
         date_dict[stem] = date
@@ -39,28 +40,31 @@ for folder_path in (OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir():
             folder_dict[stem] = set()
         folder_dict[stem].add(folder_name)
 
-r = requests.post(f"{SERVER}/v1/login", json={"username":USER, "password": PASSWORD})
+r = requests.post(f"{SERVER}/v1/login", json={"username": USER, "password": PASSWORD})
 assert r.status_code == 200
 cookies = r.cookies
+
 
 def create_resources(resource_dict, resource_name, to_json, multi_entries=False):
     if multi_entries:
         resources = chain(*resource_dict.values())
     else:
         resources = resource_dict.values()
-    
+
     for resource in tqdm(set(resources)):
         r = requests.post(f"{SERVER}/v1/{resource_name}", json=to_json(resource), cookies=cookies)
         assert r.status_code == 201
         resource_id = r.json()["id"]
         for item in resource_dict:
             if multi_entries:
-                resource_dict[item] = [resource_id if prev_resource == resource else prev_resource for prev_resource in resource_dict[item]]
+                resource_dict[item] = [resource_id if prev_resource == resource else prev_resource for prev_resource in
+                                       resource_dict[item]]
             elif resource_dict[item] == resource:
                 resource_dict[item] = resource_id
 
+
 print("Creating courses...")
-create_resources(course_dict,  "courses", lambda course: {"long_name": course, "short_name": ""})
+create_resources(course_dict, "courses", lambda course: {"long_name": course, "short_name": ""})
 
 print("Creating authors...")
 create_resources(author_dict, "authors", lambda name: {"name": name}, multi_entries=True)
@@ -80,9 +84,9 @@ for item, name in tqdm(name_dict.items()):
             "courses": [course_dict[item]],
             "folders": list(folder_dict[item]) if item in folder_dict else [],
             "visible": True
-            },
-            cookies=cookies
-        )
+        },
+        cookies=cookies
+    )
     assert r.status_code == 201
 
 assert requests.post(f"{SERVER}/v1/logout", cookies=cookies).status_code == 200
