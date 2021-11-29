@@ -146,12 +146,9 @@ class Resource(object):
             table_name = cls.PRIVATE_TABLE_NAME
         else:
             table_name = cls.PUBLIC_TABLE_NAME
-        row = g.archive.db.execute(f"select * from {table_name} where ID=?", (entry_id,)).fetchone()
-        row = cls.process_row(dict(row))
-        if row is None:
-            raise NotFound
-        else:
-            return row
+        row = dict(g.archive.db.execute(f"select * from {table_name} where ID=?", (entry_id,)).fetchone())
+        del row["ID"]
+        return row
 
     @classmethod
     def get_all(cls) -> Dict[int, Dict]:
@@ -159,19 +156,15 @@ class Resource(object):
             table_name = cls.PRIVATE_TABLE_NAME
         else:
             table_name = cls.PUBLIC_TABLE_NAME
-        return {
-            entry_id: row
-            for entry_id, row in map(
-                lambda row: (row["ID"], cls.process_row(dict(row))),
-                g.archive.db.execute(f"select * from {table_name}")
-            )
-            if row is not None
-        }
 
-    @classmethod
-    def process_row(cls, raw_row: Dict) -> Optional[Dict]:
-        del raw_row["ID"]
-        return raw_row
+        def delete_id(row: Dict):
+            del row["ID"]
+            return row
+
+        return {
+            row["ID"]: delete_id(dict(row))
+            for row in g.archive.db.execute(f"select * from {table_name}")
+        }
 
     @classmethod
     def post(cls, data: Dict) -> int:
@@ -241,7 +234,8 @@ class Document(Resource):
             if not current_user.is_authenticated and not doc["downloadable"]:
                 raise Unauthorized("You are not allowed to download this document")
 
-            return send_file(cls.path(entry_id), mimetype=doc["content_type"], as_attachment=True, download_name=doc["filename"])
+            return send_file(cls.path(entry_id), mimetype=doc["content_type"], as_attachment=True,
+                             download_name=doc["filename"])
 
     @classmethod
     def post(cls, data: Dict) -> int:
