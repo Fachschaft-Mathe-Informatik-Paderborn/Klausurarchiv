@@ -22,6 +22,8 @@ def create_app(test_config=None):
         SESSION_COOKIE_NAME="KLAUSURARCHIV",
         USERNAME=None,
         PASSWORD_SHA256=None,
+        CACHE_TYPE="SimpleCache",
+        CACHE_DEFAULT_TIMEOUT=300
     )
 
     if test_config is None:

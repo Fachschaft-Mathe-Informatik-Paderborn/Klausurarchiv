@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, TypeVar
 from flask import Flask, request, send_file
 from flask import g, make_response, Response
 from flask_login import login_required, current_user
+from flask_caching import Cache
 from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge, Unauthorized
 from werkzeug.utils import secure_filename
 
@@ -105,16 +106,20 @@ class Resource(object):
 
     @classmethod
     def register_resource(cls, app: Flask):
+        cache = Cache(app)
+
         def commit_and_make_response(data: Dict, status=200) -> Response:
             response = make_response(data, status)
             g.archive.commit()
             return response
 
         @app.get(f"{cls.RESOURCE_PATH}", endpoint=f"GET {cls.RESOURCE_PATH}", strict_slashes=False)
+        @cache.cached(unless=lambda: current_user.is_authenticated)
         def get_all():
             return make_response(cls.get_all())
 
         @app.get(f"{cls.RESOURCE_PATH}/<int:entry_id>", endpoint=f"GET {cls.RESOURCE_PATH}/id")
+        @cache.memoize(unless=lambda: current_user.is_authenticated)
         def get(entry_id: int):
             return make_response(cls.get(entry_id))
 
@@ -146,9 +151,12 @@ class Resource(object):
             table_name = cls.PRIVATE_TABLE_NAME
         else:
             table_name = cls.PUBLIC_TABLE_NAME
-        row = dict(g.archive.db.execute(f"select * from {table_name} where ID=?", (entry_id,)).fetchone())
-        del row["ID"]
-        return row
+        row = g.archive.db.execute(f"select * from {table_name} where ID=?", (entry_id,)).fetchone()
+        if row is None:
+            raise NotFound
+        entry = dict(row)
+        del entry["ID"]
+        return entry
 
     @classmethod
     def get_all(cls) -> Dict[int, Dict]:
@@ -405,6 +413,8 @@ class Item(Resource):
     @classmethod
     def get(cls, entity_id: int) -> Dict:
         item = super(cls, Item).get(entity_id)
+
+        item["visible"] = item["visible"] == 1
 
         def set_attribute(attribute_name: str, table_name: str, column_name: str):
             cursor = g.archive.db.execute(f"select {column_name} from {table_name} where ItemID=?", (entity_id,))

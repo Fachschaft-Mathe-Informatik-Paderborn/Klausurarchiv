@@ -7,3 +7,4 @@ flask_login
 coverage
 tqdm
 requests
+flask_caching
