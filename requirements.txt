@@ -8,3 +8,4 @@ coverage
 tqdm
 requests
 flask_caching
+sphinx

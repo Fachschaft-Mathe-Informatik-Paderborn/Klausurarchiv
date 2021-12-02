@@ -1,3 +1,8 @@
+"""
+db.py
+========================
+Contains the logic for all API endpoints that access the underlying database.
+"""
 import datetime
 import importlib.resources as import_res
 import os
@@ -15,7 +20,21 @@ from werkzeug.utils import secure_filename
 
 
 class Archive(object):
+    """
+    The central object of the archive, which manages the database containing all the available resources.
+    """
     def __init__(self, path: Path):
+        """
+        Initializes the archive from a given path.
+
+        If path or subfolders for docs, database or the secret key do not yet exist, they will be created accordingly.
+        Secret key will be created as read-only, only available to the owner.
+
+        Parameters
+        ----------
+        path: Path
+            path to the location where all data will be saved
+        """
         self.__path: Path = Path(path)
         if not self.__path.exists():
             os.makedirs(path)
@@ -40,37 +59,74 @@ class Archive(object):
             self.secret_path.chmod(0o400)
 
     def commit(self):
+        """Commits any changes to the database."""
         self.db.commit()
 
     @property
     def secret_key(self) -> bytes:
+        """
+        The secret key.
+
+        :getter: Reads the secret key from the corresponding file. This will read the file each time instead of permanently storing the secret key.
+        :type: bytes
+        """
         with open(self.secret_path, mode="rb") as file:
             return file.read()
 
     @property
     def db_path(self) -> Path:
+        """The path to where the database is stored."""
         return self.__path / Path("archive.sqlite")
 
     @property
     def docs_path(self) -> Path:
+        """The path to where all documents are stored."""
         return self.__path / Path("docs")
 
     @property
     def secret_path(self) -> Path:
+        """The path to where the secret key is stored."""
         return self.__path / Path("SECRET")
 
     @property
     def path(self) -> Path:
+        """The path to where all of the archives files are stored."""
         return self.__path
 
     def __eq__(self, other: 'Archive') -> bool:
+        """Checks whether the path of two archives matches."""
         return self.path == other.path
 
     def __ne__(self, other: 'Archive') -> bool:
+        """Checks whether the path of two archives does not match."""
         return not self.path == other.path
 
 
 def validate_schema(schema: Dict, data: Dict, may_be_partial: bool = False):
+    """
+    Checks whether a given dictionary of data contains all the required keys with corresponding values of the right type.
+
+    Given some data in form of a dictionary, this function determines whether a given list of required keys corresponding to a specific type is contained. There may be cases where a only a subset of the schema is required and missing keys are allowed, but any combinations contradicting the given schema will result in an exception.
+
+    Parameters
+    ----------
+        schema: Dict
+            contains a mapping of attribute name to required type
+        data: Dict
+            data to be checked in form of a simple dictionary
+        may_be_partial: bool
+            determines whether part of the schema may be missing from the given data
+
+    Returns
+    -------
+        bool
+            True if data conforms to the schema, False otherwise.
+
+    Raises
+    ------
+    BadRequest
+        if data is empty, not a dictionary, misses a required attribute or has an attribute of a different type than required
+    """
     if data is None:
         raise BadRequest("Request body may not be empty")
     if not isinstance(data, Dict):
@@ -95,6 +151,14 @@ R = TypeVar('R', bound='Resource')
 
 
 class Resource(object):
+    """
+    Any kind of resource associated with a list of attributes, which is stored in the database and accessible via the public API.
+
+    Attributes
+    ----------
+    entry_id: int
+        numerical id corresponding to one unique resource
+    """
     ATTRIBUTE_SCHEMA = dict()
     PRIVATE_TABLE_NAME = ""
     PUBLIC_TABLE_NAME = ""
@@ -188,6 +252,9 @@ class Resource(object):
 
 
 class Document(Resource):
+    """
+    A file of specific media type that is stored on disk.
+    """
     ATTRIBUTE_SCHEMA = {
         "filename": str,
         "downloadable": bool,
@@ -269,6 +336,9 @@ class Document(Resource):
 
 
 class Course(Resource):
+    """
+    A university course associated with a number of documents.
+    """
     ATTRIBUTE_SCHEMA = {
         "long_name": str,
         "short_name": str
@@ -296,6 +366,7 @@ class Course(Resource):
 
 
 class Folder(Resource):
+    """Representation of the physical folder an item may be found in."""
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
@@ -319,6 +390,13 @@ class Folder(Resource):
 
 
 class Author(Resource):
+    """Author responsible for a document.
+
+    Attributes
+    ----------
+    entry_id: int
+        id of the author in the database
+    """
     ATTRIBUTE_SCHEMA = {
         "name": str
     }
@@ -339,6 +417,14 @@ class Author(Resource):
 
 
 class Item(Resource):
+    """
+    A concrete lecture or exam consisting of multiple documents, that can be used to prepare for a number of courses.
+
+    Attributes
+    ----------
+    entry_id: int
+        id of the item in the database.
+    """
     ATTRIBUTE_SCHEMA = {
         "name": str,
         # date is not included as it may be None and the normal check can't deal with that.
@@ -354,6 +440,22 @@ class Item(Resource):
 
     @classmethod
     def validate_data(cls, data: Dict, may_be_partial: bool = False):
+        """Checks whether the dictionary representation of an item results in a valid item.
+
+        Parameters
+        ----------
+        cls : type
+            Item type
+        data: Dict
+            dictionary mapping attribute names to their respective values
+        may_be_partial: bool, optional
+            Whether part of the attributes may be missing
+
+        Raises
+        ------
+        BadRequest
+            If date attribute is missing, not a string or not ISO-formatted or if one of the other attributes contains entries with invalid entry_id
+        """
         super(Item, cls).validate_data(data, may_be_partial)
 
         if "date" in data:
