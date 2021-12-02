@@ -15,13 +15,14 @@ from klausurarchiv import create_app
 def client() -> FlaskClient:
     with tempfile.TemporaryDirectory() as tempdir:
         password_hash = sha256(bytes("4711", encoding="utf-8")).hexdigest()
-        app = create_app({"TESTING": True, "ARCHIVE_PATH": tempdir, "USERNAME": "john", "PASSWORD_SHA256": password_hash})
+        app = create_app(
+            {"TESTING": True, "ARCHIVE_PATH": tempdir, "USERNAME": "john", "PASSWORD_SHA256": password_hash})
 
         with app.test_client() as client:
             yield client
 
 
-def login(client: FlaskClient, username: str, password: str):
+def login(client: FlaskClient, username: str = "john", password: str = "4711"):
     return client.post("/v1/login", json={
         "username": username,
         "password": password
@@ -35,7 +36,7 @@ def logout(client: FlaskClient):
 def authenticated(function: Callable):
     @wraps(function)
     def wrapper(client: FlaskClient, *args, **kwargs):
-        login(client, "john", "4711")
+        login(client)
         result = function(client, *args, **kwargs)
         logout(client)
         return result
@@ -56,7 +57,7 @@ def test_login_logout(client: FlaskClient):
     assert response.status_code == 401
 
     # Logging in
-    response: TestResponse = login(client, "john", "4711")
+    response: TestResponse = login(client)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -67,7 +68,7 @@ def test_login_logout(client: FlaskClient):
     assert response.status_code == 201
 
     # Logging in again, should not change state
-    response: TestResponse = login(client, "john", "4711")
+    response: TestResponse = login(client)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -174,7 +175,7 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
 
     response: TestResponse = client.get(f"/v1/{resource_name}/")
     assert response.status_code == 200
-    assert response.get_json() == {str(rs_id) : initial_data}
+    assert response.get_json() == {str(rs_id): initial_data}
 
 
 @authenticated
@@ -314,3 +315,45 @@ def test_items_work(client):
     }
 
     template_test_resource(client, "items", full_data, partial_patch, full_patch)
+
+
+def test_hidden_items(client):
+    login(client)
+
+    response: TestResponse = client.post("/v1/documents", json={
+        "filename": "a.txt",
+        "downloadable": False,
+        "content_type": "text/plain",
+    })
+    assert response.status_code == 201
+    document_id = response.json["id"]
+
+    response: TestResponse = client.post("/v1/items", json={
+        "name": "Foundations of Rocket Science",
+        "date": None,
+        "documents": [document_id],
+        "authors": [],
+        "courses": [],
+        "folders": [],
+        "visible": False
+    })
+    assert response.status_code == 201
+    item_id = response.json["id"]
+
+    def assert_entities_exist():
+        assert len(client.get("/v1/items").json) == 1
+        assert client.get(f"/v1/items/{item_id}").status_code == 200
+        assert len(client.get("/v1/documents").json) == 1
+        assert client.get(f"/v1/documents/{document_id}").status_code == 200
+
+    def assert_entities_dont_exist():
+        assert len(client.get("/v1/items").json) == 0
+        assert client.get(f"/v1/items/{item_id}").status_code == 404
+        assert len(client.get("/v1/documents").json) == 0
+        assert client.get(f"/v1/documents/{document_id}").status_code == 404
+
+    assert_entities_exist()
+    logout(client)
+    assert_entities_dont_exist()
+    login(client)
+    assert_entities_exist()
