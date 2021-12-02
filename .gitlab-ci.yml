@@ -1,0 +1,13 @@
+image: python:3.7-alpine
+
+pages:
+  stage: deploy
+  script:
+    - pip install -r requirements
+    - sphinx-build -b html . public
+  artifacts:
+    paths:
+      - public
+  when: manual
+  tags:
+    - shared
