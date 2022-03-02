@@ -119,14 +119,14 @@ class Archive(object):
 
 def make_list_response(schema, list):
     """
-    Serializes a list of elements to a JSON list.
-    Flask won't do it for security reasons, so we have to take the string output and manually add the content-type header
+    Lists of items are serialized as a mapping from their id to the actual item
     :param schema: serialization schema of type T
     :param list: list of elements of type T
-    :return: JSON Response containing list of elements serialized by schema T
+    :return: Mapped serialization
     """
-    # return string and manually set content-type for lists, because flask does not jsonify them "for security reasons"
-    return Response(response=schema.dumps(list, many=True), status=200, mimetype="application/json")
+    # map ids to objects
+    resp = {obj["id"] : obj for obj in schema.dump(list, many=True)}
+    return resp, 200
 
 
 bp = Blueprint('database', __name__, url_prefix="/v1")

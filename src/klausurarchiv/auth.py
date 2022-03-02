@@ -41,7 +41,7 @@ def init_app(app: Flask):
         #TODO: Use werkzeug.generate_password_hash/check_password_hash
         password_digest = sha256(bytes(data["password"], encoding="utf-8")).hexdigest()
         # TODO: remove or True
-        if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"] or True:
+        if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]: # or True:
             login_user(User(data["username"]))
             return make_response({}, 200)
         else:
