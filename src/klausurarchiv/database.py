@@ -326,7 +326,10 @@ def get_document(document_id):
     if current_user.is_authenticated:
         document = Document.query.get_or_404(document_id)
     else:
-        document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=document_id).first_or_404()
+        # unauthenticated users only see documents belonging to a visible item
+        # we join Document to items via backref
+        document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=document_id)\
+            .first_or_404()
     return document_schema.dump(document)
 
 
@@ -386,7 +389,8 @@ def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
     # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
-    return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True, download_name=document.filename)
+    return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,
+                     download_name=document.filename)
 
 
 """
@@ -408,7 +412,7 @@ def get_all_items():
 @login_required
 def add_item():
     try:
-        # include db.session explicitly as workaround for weird cornercase
+        # include db.session explicitly as workaround for weird corner case
         # https://github.com/marshmallow-code/flask-marshmallow/issues/44
         loaded_schema = item_schema.load(request.json, partial=False, transient=False, session=db.session)
     except ValidationError as err:
