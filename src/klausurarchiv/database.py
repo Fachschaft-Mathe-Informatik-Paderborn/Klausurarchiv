@@ -5,8 +5,10 @@ Contains the logic for all API endpoints that access the underlying database.
 """
 import datetime
 import importlib.resources as import_res
+import io
 import os
 import sqlite3
+from io import BytesIO
 from itertools import groupby
 from pathlib import Path
 from typing import List, Optional, Dict, TypeVar
@@ -24,6 +26,7 @@ from flask_sqlalchemy import SQLAlchemy, inspect
 from flask_marshmallow import Marshmallow
 # import magic #  TODO is this needed?
 from marshmallow import ValidationError, validates, post_dump, post_load, pre_dump
+from werkzeug.wsgi import FileWrapper
 
 from klausurarchiv.models import author_schema, course_schema, folder_schema, document_schema, item_schema, \
     Author, Folder, Course, Item, Document
@@ -377,10 +380,8 @@ def upload_document():
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
-    response = make_response(document.file)
-    response.headers['Content-Type'] = document.content_type
-    response.headers['Content-Disposition'] = f'attachment; filename={document.filename}'
-    return response
+    # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
+    return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True, download_name=document.filename)
 
 
 """
