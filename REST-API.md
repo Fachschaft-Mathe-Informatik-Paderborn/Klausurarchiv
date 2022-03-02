@@ -193,9 +193,9 @@ Upload a document's content to the server.
 
 | Query Parameter | Type | Description |
 |-|-|-|
-| `id` | `int` | The ID of the document to upload. If the document doesn't exist, it is created. |
+| `id` | `int` | The ID of the document to upload. |
 
-The body of an upload request is exactly the document's content.
+The body of an upload request is exactly the document's content. Note that the document has to be created like any other resource before uploading its contents.
 
 ### Response 200 "Ok"
 
