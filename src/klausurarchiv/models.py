@@ -134,16 +134,11 @@ class ItemSchema(ma.SQLAlchemyAutoSchema):
 
 # multiple schemas required to differentiate collections of an object versus single objects
 document_schema = DocumentSchema()
-documents_schema = DocumentSchema(many=True)
 
 course_schema = CourseSchema()
-courses_schema = CourseSchema(many=True)
 
 folder_schema = FolderSchema()
-folders_schema = FolderSchema(many=True)
 
 author_schema = AuthorSchema()
-authors_schema = AuthorSchema(many=True)
 
 item_schema = ItemSchema()
-items_schema = ItemSchema(many=True)

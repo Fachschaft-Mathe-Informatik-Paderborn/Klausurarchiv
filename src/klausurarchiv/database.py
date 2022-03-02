@@ -25,8 +25,7 @@ from flask_marshmallow import Marshmallow
 # import magic #  TODO is this needed?
 from marshmallow import ValidationError, validates, post_dump, post_load, pre_dump
 
-from klausurarchiv.models import authors_schema, author_schema, course_schema, folders_schema, \
-    folder_schema, documents_schema, document_schema, items_schema, item_schema, courses_schema, \
+from klausurarchiv.models import author_schema, course_schema, folder_schema, document_schema, item_schema, \
     Author, Folder, Course, Item, Document
 from klausurarchiv.models import db
 
@@ -115,10 +114,17 @@ class Archive(object):
         return not self.path == other.path
 
 
-
 def make_list_response(schema, list):
+    """
+    Serializes a list of elements to a JSON list.
+    Flask won't do it for security reasons, so we have to take the string output and manually add the content-type header
+    :param schema: serialization schema of type T
+    :param list: list of elements of type T
+    :return: JSON Response containing list of elements serialized by schema T
+    """
     # return string and manually set content-type for lists, because flask does not jsonify them "for security reasons"
-    return Response(response=schema.dumps(list), status=200, mimetype="application/json")
+    return Response(response=schema.dumps(list, many=True), status=200, mimetype="application/json")
+
 
 bp = Blueprint('database', __name__, url_prefix="/v1")
 
@@ -131,7 +137,7 @@ Author related routes
 def get_all_authors():
     all_authors = Author.query.all()
     # flask does not jsonify lists for security reasons, so explicit mimetype
-    return make_list_response(authors_schema, all_authors)
+    return make_list_response(author_schema, all_authors)
 
 
 @bp.route("/authors/", methods=["POST"], strict_slashes=False)
@@ -184,7 +190,7 @@ Course related routes
 @bp.route("/courses/", methods=["GET"], strict_slashes=False)
 def get_all_courses():
     all_courses = Course.query.all()
-    return make_list_response(courses_schema, all_courses)
+    return make_list_response(course_schema, all_courses)
 
 
 @bp.route("/courses/", methods=["POST"], strict_slashes=False)
@@ -238,7 +244,7 @@ Folder related routes
 @bp.route("/folders/", methods=["GET"], strict_slashes=False)
 def get_all_folders():
     all_folders = Folder.query.all()
-    return make_list_response(folders_schema, all_folders)
+    return make_list_response(folder_schema, all_folders)
 
 
 @bp.route("/folders/", methods=["POST"], strict_slashes=False)
@@ -291,7 +297,7 @@ Document related routes
 @bp.route("/documents/", methods=["GET"], strict_slashes=False)
 def get_all_documents():
     all_documents = Document.query.all()
-    return make_list_response(documents_schema, all_documents)
+    return make_list_response(document_schema, all_documents)
 
 
 @bp.route("/documents/", methods=["POST"], strict_slashes=False)
@@ -385,7 +391,7 @@ Item related routes
 @bp.route("/items/", methods=["GET"], strict_slashes=False)
 def get_all_items():
     all_items = Item.query.all()
-    return make_list_response(items_schema, all_items)
+    return make_list_response(item_schema, all_items)
 
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
