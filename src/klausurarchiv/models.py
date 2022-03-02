@@ -56,7 +56,7 @@ class Author(db.Model):
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(120), nullable=False)
-    date = db.Column(db.DateTime, nullable=True)
+    date = db.Column(db.Date, nullable=True)
     visible = db.Column(db.Boolean, nullable=False, default=False)
 
     courses = db.relationship('Course', secondary=courses, lazy='subquery',
@@ -108,7 +108,7 @@ class ItemSchema(ma.SQLAlchemyAutoSchema):
         exclude = ("id", ) # ids are exposed via mapping
         include_relationships = True  # Item links between resources, so we want to include their primary keys each time
         ordered = True
-        datetimeformat = "%d-%m-%Y"  # export time format consistently
+        dateformat = "%Y-%m-%d"  # export time format consistently
 
     # requests may supply invalid (or later non-public) foreign keys - these will be read in as transient objects
     @validates("authors")
