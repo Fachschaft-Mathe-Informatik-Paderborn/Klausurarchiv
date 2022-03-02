@@ -131,6 +131,7 @@ class ItemSchema(ma.SQLAlchemyAutoSchema):
             if inspect(course).transient:
                 raise ValidationError(f"Course with id {course.id} does not exist.")
 
+
 # multiple schemas required to differentiate collections of an object versus single objects
 document_schema = DocumentSchema()
 documents_schema = DocumentSchema(many=True)

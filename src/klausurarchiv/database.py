@@ -30,10 +30,12 @@ from klausurarchiv.models import authors_schema, author_schema, course_schema, f
     Author, Folder, Course, Item, Document
 from klausurarchiv.models import db
 
+
 class Archive(object):
     """
     The central object of the archive, which manages the database containing all the available resources.
     """
+
     def __init__(self, path: Path):
         """
         Initializes the archive from a given path.
@@ -167,10 +169,12 @@ def delete_author(author_id):
 Course related routes
 """
 
+
 @bp.route("/courses/", methods=["GET"], strict_slashes=False)
 def get_all_courses():
     all_courses = Course.query.all()
     return courses_schema.dumps(all_courses)
+
 
 @bp.route("/courses/", methods=["POST"], strict_slashes=False)
 def add_course():
@@ -189,6 +193,7 @@ def get_course(course_id):
     course = Course.query.get_or_404(course_id)
     return course_schema.dump(course)
 
+
 @bp.route("/courses/<int:course_id>", methods=["PATCH"], strict_slashes=False)
 def update_course(course_id):
     try:
@@ -198,6 +203,7 @@ def update_course(course_id):
     Course.query.filter_by(id=course_id).update(loaded_schema)
     db.session.commit()
     return '', 200
+
 
 @bp.route("/courses/<int:course_id>", methods=["DELETE"], strict_slashes=False)
 def delete_course(course_id):
@@ -211,10 +217,12 @@ def delete_course(course_id):
 Folder related routes
 """
 
+
 @bp.route("/folders/", methods=["GET"], strict_slashes=False)
 def get_all_folders():
     all_folders = Folder.query.all()
     return folders_schema.dump(all_folders)
+
 
 @bp.route("/folders/", methods=["POST"], strict_slashes=False)
 def add_folder():
@@ -227,10 +235,12 @@ def add_folder():
     db.session.commit()
     return {"id": loaded_folder.id}, 201
 
+
 @bp.route("/folders/<int:folder_id>", methods=["GET"], strict_slashes=False)
 def get_folder(folder_id):
     folder = Folder.query.get_or_404(folder_id)
     return folder_schema.dump(folder)
+
 
 @bp.route("/folders/<int:folder_id>", methods=["PATCH"], strict_slashes=False)
 def update_folder(folder_id):
@@ -241,6 +251,7 @@ def update_folder(folder_id):
     Folder.query.filter_by(id=folder_id).update(loaded_schema)
     db.session.commit()
     return '', 200
+
 
 @bp.route("/folders/<int:folder_id>", methods=["DELETE"], strict_slashes=False)
 def delete_folder(folder_id):
@@ -253,10 +264,13 @@ def delete_folder(folder_id):
 """
 Document related routes
 """
+
+
 @bp.route("/documents/", methods=["GET"], strict_slashes=False)
 def get_all_documents():
     all_documents = Document.query.all()
     return documents_schema.dump(all_documents)
+
 
 @bp.route("/documents/", methods=["POST"], strict_slashes=False)
 def add_document():
@@ -269,10 +283,12 @@ def add_document():
     db.session.commit()
     return {"id": loaded_document.id}, 201
 
+
 @bp.route("/documents/<int:document_id>", methods=["GET"], strict_slashes=False)
 def get_document(document_id):
     document = Document.query.get_or_404(document_id)
     return document_schema.dump(document)
+
 
 @bp.route("/documents/<int:document_id>", methods=["PATCH"], strict_slashes=False)
 def update_document(document_id):
@@ -284,12 +300,14 @@ def update_document(document_id):
     db.session.commit()
     return '', 200
 
+
 @bp.route("/documents/<int:document_id>", methods=["DELETE"], strict_slashes=False)
 def delete_document(document_id):
     document = Document.query.get_or_404(document_id)
     db.session.delete(document)
     db.session.commit()
     return '', 200
+
 
 ALLOWED_CONTENT_TYPES = [
     "application/msword",
@@ -300,6 +318,7 @@ ALLOWED_CONTENT_TYPES = [
     "image/gif",
     "text/plain",
 ]
+
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
 def upload_document(self):
@@ -331,10 +350,13 @@ def download_document(self):
 """
 Item related routes
 """
+
+
 @bp.route("/items/", methods=["GET"], strict_slashes=False)
 def get_all_items():
     all_items = Item.query.all()
     return items_schema.dump(all_items)
+
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
 def add_item(self):
@@ -353,6 +375,7 @@ def get_item(item_id):
     item = Item.query.get_or_404(item_id)
     return item_schema.dump(item)
 
+
 @bp.route("/items/<int:item_id>", methods=["PATCH"], strict_slashes=False)
 def update_item(item_id):
     try:
@@ -367,6 +390,7 @@ def update_item(item_id):
 
     db.session.commit()
     return '', 200
+
 
 @bp.route("/items/<int:item_id>", methods=["DELETE"], strict_slashes=False)
 def delete_item(item_id):
