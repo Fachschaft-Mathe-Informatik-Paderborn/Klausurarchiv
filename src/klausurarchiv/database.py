@@ -117,7 +117,7 @@ class Archive(object):
         return not self.path == other.path
 
 
-def make_list_response(schema, list):
+def make_list_response(schema, elements):
     """
     Lists of items are serialized as a mapping from their id to the actual item
     :param schema: serialization schema of type T
@@ -125,7 +125,7 @@ def make_list_response(schema, list):
     :return: Mapped serialization
     """
     # map ids to objects
-    resp = {obj["id"] : obj for obj in schema.dump(list, many=True)}
+    resp = {obj.id : schema.dump(obj) for obj in elements}
     return resp, 200
 
 
@@ -299,8 +299,13 @@ Document related routes
 
 @bp.route("/documents/", methods=["GET"], strict_slashes=False)
 def get_all_documents():
-    all_documents = Document.query.all()
-    return make_list_response(document_schema, all_documents)
+    if current_user.is_authenticated:
+        visible_documents = Document.query.all()
+    else:
+        # unauthenticated users only see documents belonging to a visible item
+        # we join Document to items via backref
+        visible_documents = Document.query.join(Document.items, aliased=True).filter_by(visible=True).all()
+    return make_list_response(document_schema, visible_documents)
 
 
 @bp.route("/documents/", methods=["POST"], strict_slashes=False)
@@ -321,7 +326,7 @@ def get_document(document_id):
     if current_user.is_authenticated:
         document = Document.query.get_or_404(document_id)
     else:
-        document = Document.query.filter_by(downloadable=True, id=document_id).first()
+        document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=document_id).first_or_404()
     return document_schema.dump(document)
 
 
@@ -391,15 +396,21 @@ Item related routes
 
 @bp.route("/items/", methods=["GET"], strict_slashes=False)
 def get_all_items():
-    all_items = Item.query.all()
-    return make_list_response(item_schema, all_items)
+    if current_user.is_authenticated:
+        # authenticated users get to see all items
+        visible_items = Item.query.all()
+    else:
+        visible_items = Item.query.filter_by(visible=True).all()
+    return make_list_response(item_schema, visible_items)
 
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
 @login_required
 def add_item():
     try:
-        loaded_schema = item_schema.load(request.json, partial=False, transient=False)
+        # include db.session explicitly as workaround for weird cornercase
+        # https://github.com/marshmallow-code/flask-marshmallow/issues/44
+        loaded_schema = item_schema.load(request.json, partial=False, transient=False, session=db.session)
     except ValidationError as err:
         return {"message": err.messages}, 400
     loaded_item = Item(**loaded_schema)
@@ -410,7 +421,11 @@ def add_item():
 
 @bp.route("/items/<int:item_id>", methods=["GET"], strict_slashes=False)
 def get_item(item_id):
-    item = Item.query.get_or_404(item_id)
+    if current_user.is_authenticated:
+        item = Item.query.get_or_404(item_id)
+    else:
+        # unauthenticated users cannot see items with visible=False, so we can not just get by primary key
+        item = Item.query.filter_by(visible=True, id=item_id).first_or_404()
     return item_schema.dump(item)
 
 

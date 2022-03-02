@@ -23,7 +23,8 @@ def create_app(test_config=None):
         USERNAME=None,
         PASSWORD_SHA256=None,
         CACHE_TYPE="SimpleCache",
-        CACHE_DEFAULT_TIMEOUT=300
+        CACHE_DEFAULT_TIMEOUT=300,
+        # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: add Postgres for deployment
     )
 
     if test_config is None:

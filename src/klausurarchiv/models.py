@@ -56,7 +56,7 @@ class Author(db.Model):
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(120), nullable=False)
-    date = db.Column(db.DateTime, nullable=True, default=datetime.utcnow())
+    date = db.Column(db.DateTime, nullable=True)
     visible = db.Column(db.Boolean, nullable=False, default=False)
 
     courses = db.relationship('Course', secondary=courses, lazy='subquery',
@@ -72,36 +72,40 @@ class Item(db.Model):
 class DocumentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Document
-        dump_only = ("id",)  # ids are given by database and cannot be controlled by user
-        exclude = ("file",)  # supplied via separate endpoint
+        # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        exclude = ("id", "file",)  # file supplied via separate endpoint, ids are exposed through mapping
         ordered = True
 
 
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Course
-        dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        exclude = ("id", ) # ids are exposed via mapping
         ordered = True
 
 
 class FolderSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Folder
-        dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        exclude = ("id", ) # ids are exposed via mapping
         ordered = True
 
 
 class AuthorSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Author
-        dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        exclude = ("id", ) # ids are exposed via mapping
         ordered = True
 
 
 class ItemSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Item
-        dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
+        exclude = ("id", ) # ids are exposed via mapping
         include_relationships = True  # Item links between resources, so we want to include their primary keys each time
         ordered = True
         datetimeformat = "%d-%m-%Y"  # export time format consistently
