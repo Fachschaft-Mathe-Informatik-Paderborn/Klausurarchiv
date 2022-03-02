@@ -154,7 +154,9 @@ def update_author(author_id):
         loaded_schema = author_schema.load(request.json, partial=True)
     except ValidationError as err:
         return {"message": err.messages}, 400
-    Author.query.filter_by(id=author_id).update(loaded_schema)
+    a = Author.query.get_or_404(author_id)
+    for key, value in loaded_schema.items():
+        setattr(a, key, value)
     db.session.commit()
     return '', 200
 
@@ -205,7 +207,10 @@ def update_course(course_id):
         loaded_schema = course_schema.load(request.json, partial=True)
     except ValidationError as err:
         return {"message": err.messages}, 400
-    Course.query.filter_by(id=course_id).update(loaded_schema)
+    c = Course.query.get_or_404(course_id)
+    for key, value in loaded_schema.items():
+        setattr(c, key, value)
+
     db.session.commit()
     return '', 200
 
@@ -256,7 +261,9 @@ def update_folder(folder_id):
         loaded_schema = folder_schema.load(request.json, partial=True)
     except ValidationError as err:
         return {"message": err.messages}, 400
-    Folder.query.filter_by(id=folder_id).update(loaded_schema)
+    f = Folder.query.get_or_404(folder_id)
+    for key, value in loaded_schema.items():
+        setattr(f, key, value)
     db.session.commit()
     return '', 200
 
@@ -310,7 +317,9 @@ def update_document(document_id):
         loaded_schema = document_schema.load(request.json, partial=True)
     except ValidationError as err:
         return {"message": err.messages}, 400
-    Document.query.filter_by(id=document_id).update(loaded_schema)
+    d = Document.query.get_or_404(document_id)
+    for key, value in loaded_schema.items():
+        setattr(d, key, value)
     db.session.commit()
     return '', 200
 
@@ -401,8 +410,7 @@ def update_item(item_id):
         # print(loaded_schema)
     except ValidationError as err:
         return {"message": err.messages}, 400
-    # TODO: update of other cases fails here, maybe theres a broader problem and this should always be done
-    i = Item.query.get(item_id)
+    i = Item.query.get_or_404(item_id)
     for key, value in loaded_schema.items():
         setattr(i, key, value)
 
