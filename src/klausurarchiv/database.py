@@ -125,11 +125,12 @@ Author related routes
 @bp.route("/authors/", methods=["GET"], strict_slashes=False)
 def get_all_authors():
     all_authors = Author.query.all()
-    return authors_schema.dumps(all_authors)
+    # flask does not jsonify lists for security reasons, so explicit mimetype
+    return Response(response=authors_schema.dumps(all_authors), status=200, mimetype="application/json")
 
 
 @bp.route("/authors/", methods=["POST"], strict_slashes=False)
-@login_required
+# @login_required
 def add_author():
     try:
         loaded_schema = author_schema.load(request.json, partial=False)
@@ -158,7 +159,7 @@ def update_author(author_id):
     for key, value in loaded_schema.items():
         setattr(a, key, value)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 @bp.route("/authors/<int:author_id>", methods=["DELETE"], strict_slashes=False)
@@ -167,7 +168,7 @@ def delete_author(author_id):
     author = Author.query.get_or_404(author_id)
     db.session.delete(author)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 """
@@ -212,7 +213,7 @@ def update_course(course_id):
         setattr(c, key, value)
 
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 @bp.route("/courses/<int:course_id>", methods=["DELETE"], strict_slashes=False)
@@ -221,7 +222,7 @@ def delete_course(course_id):
     course = Course.query.get_or_404(course_id)
     db.session.delete(course)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 """
@@ -265,7 +266,7 @@ def update_folder(folder_id):
     for key, value in loaded_schema.items():
         setattr(f, key, value)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 @bp.route("/folders/<int:folder_id>", methods=["DELETE"], strict_slashes=False)
@@ -274,7 +275,7 @@ def delete_folder(folder_id):
     folder = Folder.query.get_or_404(folder_id)
     db.session.delete(folder)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 """
@@ -321,7 +322,7 @@ def update_document(document_id):
     for key, value in loaded_schema.items():
         setattr(d, key, value)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 @bp.route("/documents/<int:document_id>", methods=["DELETE"], strict_slashes=False)
@@ -330,7 +331,7 @@ def delete_document(document_id):
     document = Document.query.get_or_404(document_id)
     db.session.delete(document)
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 ALLOWED_CONTENT_TYPES = [
@@ -346,24 +347,23 @@ ALLOWED_CONTENT_TYPES = [
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
 @login_required
-def upload_document(self):
+def upload_document():
     document_id = request.args.get("id", default=None)
-    document = Document.query.get(document_id)
-    if not document:
-        document = Document()
+    document = Document.query.get_or_404(document_id)
     document.file = request.get_data()
-    document.content_type = magic.from_buffer(document.file, mime=True)
-    if document.content_type not in self.ALLOWED_CONTENT_TYPES:
+    document.content_type = request.headers.get("Content-Type")
+    # TODO: filename? maybe
+    if document.content_type not in ALLOWED_CONTENT_TYPES:
         return {"message": f"Content Type {document.content_type} not allowed"}, 400
     if not document.filename:
         document.filename = hashlib.sha256(document.file).hexdigest()
     db.session.add(document)
     db.session.commit()
-    return {"id": document.id}, 201
+    return dict(), 200
 
 
 @bp.route("/download", methods=["GET"], strict_slashes=False)
-def download_document(self):
+def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
     response = make_response(document.file)
@@ -385,7 +385,7 @@ def get_all_items():
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
 @login_required
-def add_item(self):
+def add_item():
     try:
         loaded_schema = item_schema.load(request.json, partial=False, transient=False)
     except ValidationError as err:
@@ -415,7 +415,7 @@ def update_item(item_id):
         setattr(i, key, value)
 
     db.session.commit()
-    return '', 200
+    return dict(), 200
 
 
 @bp.route("/items/<int:item_id>", methods=["DELETE"], strict_slashes=False)
@@ -424,4 +424,4 @@ def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
     db.session.delete(item)
     db.session.commit()
-    return '', 200
+    return dict(), 200

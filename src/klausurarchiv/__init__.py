@@ -34,7 +34,8 @@ def create_app(test_config=None):
     try:
         app.secret_key = database.Archive(app.config["ARCHIVE_PATH"]).secret_key
     except FileNotFoundError:
-        pass
+        # TODO: THIS
+        app.secret_key = "Insane secret"
 
     login_manager = LoginManager()
     login_manager.init_app(app)
