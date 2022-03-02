@@ -115,6 +115,11 @@ class Archive(object):
         return not self.path == other.path
 
 
+
+def make_list_response(schema, list):
+    # return string and manually set content-type for lists, because flask does not jsonify them "for security reasons"
+    return Response(response=schema.dumps(list), status=200, mimetype="application/json")
+
 bp = Blueprint('database', __name__, url_prefix="/v1")
 
 """
@@ -126,7 +131,7 @@ Author related routes
 def get_all_authors():
     all_authors = Author.query.all()
     # flask does not jsonify lists for security reasons, so explicit mimetype
-    return Response(response=authors_schema.dumps(all_authors), status=200, mimetype="application/json")
+    return make_list_response(authors_schema, all_authors)
 
 
 @bp.route("/authors/", methods=["POST"], strict_slashes=False)
@@ -145,7 +150,7 @@ def add_author():
 @bp.route("/authors/<int:author_id>", methods=["GET"], strict_slashes=False)
 def get_author(author_id):
     author = Author.query.get_or_404(author_id)
-    return author_schema.dumps(author)
+    return author_schema.dump(author)
 
 
 @bp.route("/authors/<int:author_id>", methods=["PATCH"], strict_slashes=False)
@@ -179,7 +184,7 @@ Course related routes
 @bp.route("/courses/", methods=["GET"], strict_slashes=False)
 def get_all_courses():
     all_courses = Course.query.all()
-    return courses_schema.dumps(all_courses)
+    return make_list_response(courses_schema, all_courses)
 
 
 @bp.route("/courses/", methods=["POST"], strict_slashes=False)
@@ -198,7 +203,7 @@ def add_course():
 @bp.route("/courses/<int:course_id>", methods=["GET"], strict_slashes=False)
 def get_course(course_id):
     course = Course.query.get_or_404(course_id)
-    return course_schema.dumps(course)
+    return course_schema.dump(course)
 
 
 @bp.route("/courses/<int:course_id>", methods=["PATCH"], strict_slashes=False)
@@ -233,7 +238,7 @@ Folder related routes
 @bp.route("/folders/", methods=["GET"], strict_slashes=False)
 def get_all_folders():
     all_folders = Folder.query.all()
-    return folders_schema.dumps(all_folders)
+    return make_list_response(folders_schema, all_folders)
 
 
 @bp.route("/folders/", methods=["POST"], strict_slashes=False)
@@ -252,7 +257,7 @@ def add_folder():
 @bp.route("/folders/<int:folder_id>", methods=["GET"], strict_slashes=False)
 def get_folder(folder_id):
     folder = Folder.query.get_or_404(folder_id)
-    return folder_schema.dumps(folder)
+    return folder_schema.dump(folder)
 
 
 @bp.route("/folders/<int:folder_id>", methods=["PATCH"], strict_slashes=False)
@@ -286,7 +291,7 @@ Document related routes
 @bp.route("/documents/", methods=["GET"], strict_slashes=False)
 def get_all_documents():
     all_documents = Document.query.all()
-    return documents_schema.dumps(all_documents)
+    return make_list_response(documents_schema, all_documents)
 
 
 @bp.route("/documents/", methods=["POST"], strict_slashes=False)
@@ -308,7 +313,7 @@ def get_document(document_id):
         document = Document.query.get_or_404(document_id)
     else:
         document = Document.query.filter_by(downloadable=True, id=document_id).first()
-    return document_schema.dumps(document)
+    return document_schema.dump(document)
 
 
 @bp.route("/documents/<int:document_id>", methods=["PATCH"], strict_slashes=False)
@@ -380,7 +385,7 @@ Item related routes
 @bp.route("/items/", methods=["GET"], strict_slashes=False)
 def get_all_items():
     all_items = Item.query.all()
-    return items_schema.dumps(all_items)
+    return make_list_response(items_schema, all_items)
 
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
@@ -399,7 +404,7 @@ def add_item():
 @bp.route("/items/<int:item_id>", methods=["GET"], strict_slashes=False)
 def get_item(item_id):
     item = Item.query.get_or_404(item_id)
-    return item_schema.dumps(item)
+    return item_schema.dump(item)
 
 
 @bp.route("/items/<int:item_id>", methods=["PATCH"], strict_slashes=False)
