@@ -129,6 +129,7 @@ def get_all_authors():
 
 
 @bp.route("/authors/", methods=["POST"], strict_slashes=False)
+@login_required
 def add_author():
     try:
         loaded_schema = author_schema.load(request.json, partial=False)
@@ -143,10 +144,11 @@ def add_author():
 @bp.route("/authors/<int:author_id>", methods=["GET"], strict_slashes=False)
 def get_author(author_id):
     author = Author.query.get_or_404(author_id)
-    return author_schema.dump(author)
+    return author_schema.dumps(author)
 
 
 @bp.route("/authors/<int:author_id>", methods=["PATCH"], strict_slashes=False)
+@login_required
 def update_author(author_id):
     try:
         loaded_schema = author_schema.load(request.json, partial=True)
@@ -158,6 +160,7 @@ def update_author(author_id):
 
 
 @bp.route("/authors/<int:author_id>", methods=["DELETE"], strict_slashes=False)
+@login_required
 def delete_author(author_id):
     author = Author.query.get_or_404(author_id)
     db.session.delete(author)
@@ -177,6 +180,7 @@ def get_all_courses():
 
 
 @bp.route("/courses/", methods=["POST"], strict_slashes=False)
+@login_required
 def add_course():
     try:
         loaded_schema = course_schema.load(request.json, partial=False)
@@ -191,10 +195,11 @@ def add_course():
 @bp.route("/courses/<int:course_id>", methods=["GET"], strict_slashes=False)
 def get_course(course_id):
     course = Course.query.get_or_404(course_id)
-    return course_schema.dump(course)
+    return course_schema.dumps(course)
 
 
 @bp.route("/courses/<int:course_id>", methods=["PATCH"], strict_slashes=False)
+@login_required
 def update_course(course_id):
     try:
         loaded_schema = course_schema.load(request.json, partial=True)
@@ -206,6 +211,7 @@ def update_course(course_id):
 
 
 @bp.route("/courses/<int:course_id>", methods=["DELETE"], strict_slashes=False)
+@login_required
 def delete_course(course_id):
     course = Course.query.get_or_404(course_id)
     db.session.delete(course)
@@ -221,10 +227,11 @@ Folder related routes
 @bp.route("/folders/", methods=["GET"], strict_slashes=False)
 def get_all_folders():
     all_folders = Folder.query.all()
-    return folders_schema.dump(all_folders)
+    return folders_schema.dumps(all_folders)
 
 
 @bp.route("/folders/", methods=["POST"], strict_slashes=False)
+@login_required
 def add_folder():
     try:
         loaded_schema = folder_schema.load(request.json, partial=False)
@@ -239,10 +246,11 @@ def add_folder():
 @bp.route("/folders/<int:folder_id>", methods=["GET"], strict_slashes=False)
 def get_folder(folder_id):
     folder = Folder.query.get_or_404(folder_id)
-    return folder_schema.dump(folder)
+    return folder_schema.dumps(folder)
 
 
 @bp.route("/folders/<int:folder_id>", methods=["PATCH"], strict_slashes=False)
+@login_required
 def update_folder(folder_id):
     try:
         loaded_schema = folder_schema.load(request.json, partial=True)
@@ -254,6 +262,7 @@ def update_folder(folder_id):
 
 
 @bp.route("/folders/<int:folder_id>", methods=["DELETE"], strict_slashes=False)
+@login_required
 def delete_folder(folder_id):
     folder = Folder.query.get_or_404(folder_id)
     db.session.delete(folder)
@@ -269,10 +278,11 @@ Document related routes
 @bp.route("/documents/", methods=["GET"], strict_slashes=False)
 def get_all_documents():
     all_documents = Document.query.all()
-    return documents_schema.dump(all_documents)
+    return documents_schema.dumps(all_documents)
 
 
 @bp.route("/documents/", methods=["POST"], strict_slashes=False)
+@login_required
 def add_document():
     try:
         loaded_schema = document_schema.load(request.json, partial=False)
@@ -286,11 +296,15 @@ def add_document():
 
 @bp.route("/documents/<int:document_id>", methods=["GET"], strict_slashes=False)
 def get_document(document_id):
-    document = Document.query.get_or_404(document_id)
-    return document_schema.dump(document)
+    if current_user.is_authenticated:
+        document = Document.query.get_or_404(document_id)
+    else:
+        document = Document.query.filter_by(downloadable=True, id=document_id).first()
+    return document_schema.dumps(document)
 
 
 @bp.route("/documents/<int:document_id>", methods=["PATCH"], strict_slashes=False)
+@login_required
 def update_document(document_id):
     try:
         loaded_schema = document_schema.load(request.json, partial=True)
@@ -302,6 +316,7 @@ def update_document(document_id):
 
 
 @bp.route("/documents/<int:document_id>", methods=["DELETE"], strict_slashes=False)
+@login_required
 def delete_document(document_id):
     document = Document.query.get_or_404(document_id)
     db.session.delete(document)
@@ -321,6 +336,7 @@ ALLOWED_CONTENT_TYPES = [
 
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
+@login_required
 def upload_document(self):
     document_id = request.args.get("id", default=None)
     document = Document.query.get(document_id)
@@ -355,10 +371,11 @@ Item related routes
 @bp.route("/items/", methods=["GET"], strict_slashes=False)
 def get_all_items():
     all_items = Item.query.all()
-    return items_schema.dump(all_items)
+    return items_schema.dumps(all_items)
 
 
 @bp.route("/items/", methods=["POST"], strict_slashes=False)
+@login_required
 def add_item(self):
     try:
         loaded_schema = item_schema.load(request.json, partial=False, transient=False)
@@ -373,10 +390,11 @@ def add_item(self):
 @bp.route("/items/<int:item_id>", methods=["GET"], strict_slashes=False)
 def get_item(item_id):
     item = Item.query.get_or_404(item_id)
-    return item_schema.dump(item)
+    return item_schema.dumps(item)
 
 
 @bp.route("/items/<int:item_id>", methods=["PATCH"], strict_slashes=False)
+@login_required
 def update_item(item_id):
     try:
         loaded_schema = item_schema.load(request.json, partial=True)
@@ -393,6 +411,7 @@ def update_item(item_id):
 
 
 @bp.route("/items/<int:item_id>", methods=["DELETE"], strict_slashes=False)
+@login_required
 def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
     db.session.delete(item)
