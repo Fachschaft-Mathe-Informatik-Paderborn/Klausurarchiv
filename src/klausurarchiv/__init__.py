@@ -7,7 +7,7 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 
-from klausurarchiv import auth, db
+from klausurarchiv import auth, database
 
 
 def create_app(test_config=None):
@@ -32,7 +32,7 @@ def create_app(test_config=None):
         app.config.from_mapping(test_config)
 
     try:
-        app.secret_key = db.Archive(app.config["ARCHIVE_PATH"]).secret_key
+        app.secret_key = database.Archive(app.config["ARCHIVE_PATH"]).secret_key
     except FileNotFoundError:
         pass
 
@@ -61,11 +61,20 @@ def create_app(test_config=None):
 
     @app.before_request
     def open_archive():
-        g.archive = db.Archive(app.config["ARCHIVE_PATH"])
+        g.archive = database.Archive(app.config["ARCHIVE_PATH"])
 
     auth.init_app(app)
 
-    for resource in [db.Document, db.Course, db.Folder, db.Author, db.Item]:
-        resource.register_resource(app)
+    # separately because order is important!
+    from klausurarchiv.models import db
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+
+    from klausurarchiv.models import ma
+    ma.init_app(app)
+
+    app.register_blueprint(database.bp)
 
     return app

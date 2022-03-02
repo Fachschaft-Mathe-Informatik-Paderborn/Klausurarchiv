@@ -2,8 +2,6 @@ from flask import Flask, request, make_response
 from flask_login import UserMixin, LoginManager, login_user, logout_user
 from hashlib import sha256
 
-from klausurarchiv.db import validate_schema
-
 
 class User(UserMixin):
     """
@@ -33,11 +31,13 @@ def init_app(app: Flask):
     @app.post("/v1/login")
     def login():
         data = request.get_json()
-        validate_schema({
-            "username": str,
-            "password": str
-        }, data)
+        # TODO: Marshmallow dat shit
+        # validate_schema({
+        #     "username": str,
+            # "password": str
+        # }, data)
 
+        #TODO: Use werkzeug.generate_password_hash/check_password_hash
         password_digest = sha256(bytes(data["password"], encoding="utf-8")).hexdigest()
         if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
             login_user(User(data["username"]))
