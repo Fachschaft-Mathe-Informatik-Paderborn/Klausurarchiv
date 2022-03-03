@@ -5,14 +5,27 @@
 # at the time of this writing.
 from itertools import chain
 from pathlib import Path
+import argparse
 
 import requests
 from tqdm import tqdm
 
-SERVER = "https://my.domain/"
-USER = "user"
-PASSWORD = "topsecret"
-OLD_ARCHIVE_FOLDER = Path("path/to/archive/50-fertig")
+parser = argparse.ArgumentParser(
+    description="Transport item metadata from an old archive to a new one")
+parser.add_argument("-s", "--server", type=str, nargs=1,
+                    help="The URL via which the archive is available")
+parser.add_argument("-u", "--user", type=str, nargs=1,
+                    help="The username to use for authentication")
+parser.add_argument("-p", "--password", type=str, nargs=1,
+                    help="The password fo use for authentication")
+parser.add_argument("-a", "--archive", type=Path, nargs=1,
+                    help="The path to the old archive, ending in '50-fertig'")
+args = parser.parse_args()
+
+SERVER = args.server[0]
+USER = args.user[0]
+PASSWORD = args.password[0]
+OLD_ARCHIVE_FOLDER = args.archive[0]
 
 name_dict = dict()
 course_dict = dict()
@@ -29,18 +42,16 @@ for folder_path in (OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir():
     for item_path in folder_path.glob("*.pdf"):
         stem = item_path.stem
 
-        (course, date, filename, _, authors) = stem.split(" - ")
+        (courses, date, filename, _, authors) = stem.split(" - ")
 
-        name_dict[stem] = course
-        course_dict[stem] = course
+        name_dict[stem] = courses
+        course_dict[stem] = set(courses.split("; "))
         date_dict[stem] = date
         author_dict[stem] = set(authors.split("; "))
+        folder_dict[stem] = folder_name
 
-        if course not in folder_dict:
-            folder_dict[stem] = set()
-        folder_dict[stem].add(folder_name)
-
-r = requests.post(f"{SERVER}/v1/login", json={"username": USER, "password": PASSWORD})
+r = requests.post(f"{SERVER}/v1/login",
+                  json={"username": USER, "password": PASSWORD})
 assert r.status_code == 200
 cookies = r.cookies
 
@@ -51,26 +62,28 @@ def create_resources(resource_dict, resource_name, to_json, multi_entries=False)
     else:
         resources = resource_dict.values()
 
+    resource_ids = dict()
+
     for resource in tqdm(set(resources)):
-        r = requests.post(f"{SERVER}/v1/{resource_name}", json=to_json(resource), cookies=cookies)
+        r = requests.post(f"{SERVER}/v1/{resource_name}",
+                          json=to_json(resource), cookies=cookies)
         assert r.status_code == 201
-        resource_id = r.json()["id"]
-        for item in resource_dict:
-            if multi_entries:
-                resource_dict[item] = [resource_id if prev_resource == resource else prev_resource for prev_resource in
-                                       resource_dict[item]]
-            elif resource_dict[item] == resource:
-                resource_dict[item] = resource_id
+        resource_ids[resource] = r.json()["id"]
 
+    return resource_ids
 
-print("Creating courses...")
-create_resources(course_dict, "courses", lambda course: {"long_name": course, "short_name": ""})
 
 print("Creating authors...")
-create_resources(author_dict, "authors", lambda name: {"name": name}, multi_entries=True)
+author_ids = create_resources(author_dict, "authors", lambda name: {
+                              "name": name}, multi_entries=True)
+
+print("Creating courses...")
+course_ids = create_resources(course_dict, "courses", lambda course: {
+                              "long_name": course, "short_name": ""}, multi_entries=True)
 
 print("Creating folders...")
-create_resources(folder_dict, "folders", lambda name: {"name": name}, multi_entries=True)
+folder_ids = create_resources(folder_dict, "folders", lambda name: {
+                              "name": name}, multi_entries=False)
 
 print("Creating items")
 for item, name in tqdm(name_dict.items()):
@@ -80,9 +93,9 @@ for item, name in tqdm(name_dict.items()):
             "name": name,
             "date": date_dict[item],
             "documents": [],
-            "authors": list(author_dict[item]),
-            "courses": [course_dict[item]],
-            "folders": list(folder_dict[item]) if item in folder_dict else [],
+            "authors": [author_ids[author] for author in author_dict[item]],
+            "courses": [course_ids[course] for course in course_dict[item]],
+            "folders": [folder_ids[folder_dict[item]]],
             "visible": True
         },
         cookies=cookies
