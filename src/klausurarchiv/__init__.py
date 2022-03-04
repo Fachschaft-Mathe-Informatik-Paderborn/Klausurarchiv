@@ -24,6 +24,7 @@ def create_app(test_config=None):
         PASSWORD_SHA256=None,
         CACHE_TYPE="SimpleCache",
         CACHE_DEFAULT_TIMEOUT=300,
+        SQLALCHEMY_TRACK_MODIFICATIONS =False # disables (unused) hooks that impact performance significantly
         # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: switch to Postgres for deployment
     )
 
