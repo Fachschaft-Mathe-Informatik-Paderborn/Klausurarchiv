@@ -24,7 +24,7 @@ def create_app(test_config=None):
         PASSWORD_SHA256=None,
         CACHE_TYPE="SimpleCache",
         CACHE_DEFAULT_TIMEOUT=300,
-        # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: add Postgres for deployment
+        # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: switch to Postgres for deployment
     )
 
     if test_config is None:
@@ -35,8 +35,9 @@ def create_app(test_config=None):
     try:
         app.secret_key = database.Archive(app.config["ARCHIVE_PATH"]).secret_key
     except FileNotFoundError:
-        # TODO: THIS
-        app.secret_key = "Insane secret"
+        # might wanna randomly generate a secret_key, but that would invalidate old session cookies i think
+        app.secret_key = "KLAUSURARCHIV_INSECURE_FALLBACK_SECRET"
+        app.logger.warn("Secret key was not found, using insecure fallback secret key!")
 
     login_manager = LoginManager()
     login_manager.init_app(app)
