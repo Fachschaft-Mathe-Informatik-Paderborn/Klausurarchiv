@@ -144,7 +144,7 @@ def get_all_authors():
 
 
 @bp.route("/authors/", methods=["POST"], strict_slashes=False)
-# @login_required
+@login_required
 def add_author():
     try:
         loaded_schema = author_schema.load(request.json, partial=False)
