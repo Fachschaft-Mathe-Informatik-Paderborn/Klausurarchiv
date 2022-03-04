@@ -2,6 +2,7 @@ from datetime import datetime
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import inspect, SQLAlchemy
 from marshmallow import validates, ValidationError
+from werkzeug.utils import secure_filename
 
 db = SQLAlchemy()
 ma = Marshmallow()
@@ -76,6 +77,10 @@ class DocumentSchema(ma.SQLAlchemyAutoSchema):
         exclude = ("id", "file",)  # file supplied via separate endpoint, ids are exposed through mapping
         ordered = True
 
+    @validates("filename")
+    def filename_is_secure(self, filename):
+        if secure_filename(filename) != filename or len(secure_filename(filename)) == 0:
+            raise ValidationError("Insecure filename")
 
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:

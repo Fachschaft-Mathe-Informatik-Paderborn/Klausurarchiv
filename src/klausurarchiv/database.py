@@ -3,6 +3,7 @@ database.py
 ========================
 Contains the logic for all API endpoints that access the underlying database.
 """
+import cgi
 import datetime
 import importlib.resources as import_res
 import io
@@ -12,7 +13,7 @@ from io import BytesIO
 from itertools import groupby
 from pathlib import Path
 from typing import List, Optional, Dict, TypeVar
-from flask import Flask, request, send_file, Blueprint
+from flask import Flask, request, send_file, Blueprint, current_app
 from flask import g, make_response, Response
 from flask_login import login_required, current_user
 from flask_caching import Cache
@@ -24,7 +25,6 @@ import hashlib
 from flask import Flask, request, make_response
 from flask_sqlalchemy import SQLAlchemy, inspect
 from flask_marshmallow import Marshmallow
-# import magic #  TODO is this needed?
 from marshmallow import ValidationError, validates, post_dump, post_load, pre_dump
 from werkzeug.wsgi import FileWrapper
 
@@ -316,6 +316,7 @@ def add_document():
     except ValidationError as err:
         return {"message": err.messages}, 400
     loaded_document = Document(**loaded_schema)
+
     db.session.add(loaded_document)
     db.session.commit()
     return {"id": loaded_document.id}, 201
@@ -372,13 +373,28 @@ ALLOWED_CONTENT_TYPES = [
 def upload_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
+
+    if request.content_length > current_app.config["MAX_CONTENT_LENGTH"]:
+        raise RequestEntityTooLarge()
+
     document.file = request.get_data()
+
     document.content_type = request.headers.get("Content-Type")
-    # TODO: filename? maybe
     if document.content_type not in ALLOWED_CONTENT_TYPES:
         return {"message": f"Content Type {document.content_type} not allowed"}, 400
-    if not document.filename:
-        document.filename = hashlib.sha256(document.file).hexdigest()
+
+    # parse Content-Disposition header for secure access to attributes without janky regex or similar
+    _, params = cgi.parse_header(request.headers.get('Content-Disposition', ""))
+
+    # if given override the old filename by the one given through the header, otherwise default to existing one
+    new_filename = params.get("filename", document.filename)
+
+    if not new_filename or secure_filename(new_filename) != new_filename:
+        # if somehow neither header nor database contain a filename (or they are corrutped) we fallback to random
+        new_filename = hashlib.sha256(bytes(document.file)).hexdigest()
+
+    document.filename = new_filename
+
     db.session.add(document)
     db.session.commit()
     return dict(), 200
