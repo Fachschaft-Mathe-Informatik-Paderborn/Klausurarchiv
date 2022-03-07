@@ -4,117 +4,14 @@ database.py
 Contains the logic for all API endpoints that access the underlying database.
 """
 import cgi
-import datetime
-import importlib.resources as import_res
-import io
-import os
-import sqlite3
-from io import BytesIO
-from itertools import groupby
-from pathlib import Path
-from typing import List, Optional, Dict, TypeVar
-from flask import Flask, request, send_file, Blueprint, current_app
-from flask import g, make_response, Response
-from flask_login import login_required, current_user
-from flask_caching import Cache
-from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge, Unauthorized
-from werkzeug.utils import secure_filename
-import base64
-from datetime import datetime
 import hashlib
-from flask import Flask, request, make_response
-from flask_sqlalchemy import SQLAlchemy, inspect
-from flask_marshmallow import Marshmallow
-from marshmallow import ValidationError, validates, post_dump, post_load, pre_dump
-from werkzeug.wsgi import FileWrapper
+import io
 
-from klausurarchiv.models import author_schema, course_schema, folder_schema, document_schema, item_schema, \
-    Author, Folder, Course, Item, Document
-from klausurarchiv.models import db
+from flask import request, send_file, Blueprint, current_app
+from flask_login import login_required, current_user
+from werkzeug.exceptions import RequestEntityTooLarge
 
-
-class Archive(object):
-    """
-    The central object of the archive, which manages the database containing all the available resources.
-    """
-
-    def __init__(self, path: Path):
-        """
-        Initializes the archive from a given path.
-
-        If path or subfolders for docs, database or the secret key do not yet exist, they will be created accordingly.
-        Secret key will be created as read-only, only available to the owner.
-
-        Parameters
-        ----------
-        path: Path
-            path to the location where all data will be saved
-        """
-        self.__path: Path = Path(path)
-        if not self.__path.exists():
-            os.makedirs(path)
-
-        # Check Docs Dir
-        if not self.docs_path.exists():
-            os.makedirs(self.docs_path)
-
-        # Check database
-        database_exists = self.db_path.exists()
-        self.db: sqlite3.Connection = sqlite3.connect(self.db_path)
-        self.db.row_factory = sqlite3.Row
-        if not database_exists:
-            import klausurarchiv
-            with import_res.open_text(klausurarchiv, "schema.sql") as f:
-                self.db.executescript(f.read())
-
-        # Check secret
-        if not self.secret_path.exists():
-            with open(self.secret_path, mode="wb") as file:
-                file.write(os.urandom(32))
-            self.secret_path.chmod(0o400)
-
-    def commit(self):
-        """Commits any changes to the database."""
-        self.db.commit()
-
-    @property
-    def secret_key(self) -> bytes:
-        """
-        The secret key.
-
-        :getter: Reads the secret key from the corresponding file. This will read the file each time instead of permanently storing the secret key.
-        :type: bytes
-        """
-        with open(self.secret_path, mode="rb") as file:
-            return file.read()
-
-    @property
-    def db_path(self) -> Path:
-        """The path to where the database is stored."""
-        return self.__path / Path("archive.sqlite")
-
-    @property
-    def docs_path(self) -> Path:
-        """The path to where all documents are stored."""
-        return self.__path / Path("docs")
-
-    @property
-    def secret_path(self) -> Path:
-        """The path to where the secret key is stored."""
-        return self.__path / Path("SECRET")
-
-    @property
-    def path(self) -> Path:
-        """The path to where all of the archives files are stored."""
-        return self.__path
-
-    def __eq__(self, other: 'Archive') -> bool:
-        """Checks whether the path of two archives matches."""
-        return self.path == other.path
-
-    def __ne__(self, other: 'Archive') -> bool:
-        """Checks whether the path of two archives does not match."""
-        return not self.path == other.path
+from klausurarchiv.models import *
 
 
 def make_list_response(schema, elements):

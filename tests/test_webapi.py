@@ -13,13 +13,12 @@ from klausurarchiv import create_app
 
 @pytest.fixture
 def client() -> FlaskClient:
-    with tempfile.TemporaryDirectory() as tempdir:
-        password_hash = sha256(bytes("4711", encoding="utf-8")).hexdigest()
-        app = create_app(
-            {"TESTING": True, "ARCHIVE_PATH": tempdir, "USERNAME": "john", "PASSWORD_SHA256": password_hash})
+    password_hash = sha256(bytes("4711", encoding="utf-8")).hexdigest()
+    app = create_app(
+        {"TESTING": True, "USERNAME": "john", "PASSWORD_SHA256": password_hash})
 
-        with app.test_client() as client:
-            yield client
+    with app.test_client() as client:
+        yield client
 
 
 def login(client: FlaskClient, username: str = "john", password: str = "4711"):
