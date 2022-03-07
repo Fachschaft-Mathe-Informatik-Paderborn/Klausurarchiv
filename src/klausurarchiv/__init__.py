@@ -7,7 +7,7 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 
-from klausurarchiv import auth, db
+from klausurarchiv import auth, database
 
 
 def create_app(test_config=None):
@@ -23,7 +23,9 @@ def create_app(test_config=None):
         USERNAME=None,
         PASSWORD_SHA256=None,
         CACHE_TYPE="SimpleCache",
-        CACHE_DEFAULT_TIMEOUT=300
+        CACHE_DEFAULT_TIMEOUT=300,
+        SQLALCHEMY_TRACK_MODIFICATIONS =False # disables (unused) hooks that impact performance significantly
+        # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: switch to Postgres for deployment
     )
 
     if test_config is None:
@@ -32,9 +34,11 @@ def create_app(test_config=None):
         app.config.from_mapping(test_config)
 
     try:
-        app.secret_key = db.Archive(app.config["ARCHIVE_PATH"]).secret_key
+        app.secret_key = database.Archive(app.config["ARCHIVE_PATH"]).secret_key
     except FileNotFoundError:
-        pass
+        # might wanna randomly generate a secret_key, but that would invalidate old session cookies i think
+        app.secret_key = "KLAUSURARCHIV_INSECURE_FALLBACK_SECRET"
+        app.logger.warn("Secret key was not found, using insecure fallback secret key!")
 
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -61,11 +65,20 @@ def create_app(test_config=None):
 
     @app.before_request
     def open_archive():
-        g.archive = db.Archive(app.config["ARCHIVE_PATH"])
+        g.archive = database.Archive(app.config["ARCHIVE_PATH"])
 
     auth.init_app(app)
 
-    for resource in [db.Document, db.Course, db.Folder, db.Author, db.Item]:
-        resource.register_resource(app)
+    # separately because order is important!
+    from klausurarchiv.models import db
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+
+    from klausurarchiv.models import ma
+    ma.init_app(app)
+
+    app.register_blueprint(database.bp)
 
     return app

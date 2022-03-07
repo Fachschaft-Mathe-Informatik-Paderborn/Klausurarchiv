@@ -9,3 +9,7 @@ tqdm
 requests
 flask_caching
 sphinx
+flask_SQLAlchemy
+flask_marshmallow
+marshmallow
+marshmallow-sqlalchemy

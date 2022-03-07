@@ -2,7 +2,8 @@ from flask import Flask, request, make_response
 from flask_login import UserMixin, LoginManager, login_user, logout_user
 from hashlib import sha256
 
-from klausurarchiv.db import validate_schema
+from marshmallow import Schema, fields
+from marshmallow import ValidationError
 
 
 class User(UserMixin):
@@ -33,14 +34,19 @@ def init_app(app: Flask):
     @app.post("/v1/login")
     def login():
         data = request.get_json()
-        validate_schema({
-            "username": str,
-            "password": str
-        }, data)
 
-        password_digest = sha256(bytes(data["password"], encoding="utf-8")).hexdigest()
-        if data["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
-            login_user(User(data["username"]))
+        class CredentialsSchema(Schema):
+            username = fields.Str()
+            password = fields.Str()
+
+        try:
+            credentials = CredentialsSchema().load(data)
+        except ValidationError as err:
+            return {"message": err.messages}, 400
+
+        password_digest = sha256(bytes(credentials["password"], encoding="utf-8")).hexdigest()
+        if credentials["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
+            login_user(User(credentials["username"]))
             return make_response({}, 200)
         else:
             return make_response({"message": "Invalid username or password"}, 401)
