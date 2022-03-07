@@ -42,7 +42,7 @@ def init_app(app: Flask):
         try:
             credentials = CredentialsSchema().load(data)
         except ValidationError as err:
-            return {"message": err.messages}, 400
+            return {"message": str(err.messages)}, 400
 
         password_digest = sha256(bytes(credentials["password"], encoding="utf-8")).hexdigest()
         if credentials["username"] == app.config["USERNAME"] and password_digest == app.config["PASSWORD_SHA256"]:
