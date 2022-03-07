@@ -100,6 +100,8 @@ for item, name in tqdm(name_dict.items()):
         },
         cookies=cookies
     )
+    if r.status_code != 201:
+        print(r.json())
     assert r.status_code == 201
 
 assert requests.post(f"{SERVER}/v1/logout", cookies=cookies).status_code == 200

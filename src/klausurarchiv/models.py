@@ -31,32 +31,32 @@ folders = db.Table('ItemFolderMap',
 
 class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(120), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
     downloadable = db.Column(db.Boolean, nullable=False, default=False)
-    content_type = db.Column(db.String(120), nullable=False)
+    content_type = db.Column(db.String(200), nullable=False)
 
     file = db.Column(db.LargeBinary, nullable=True)
 
 
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    long_name = db.Column(db.String(120), nullable=False)
+    long_name = db.Column(db.String(200), nullable=False)
     short_name = db.Column(db.String(60), nullable=False)
 
 
 class Folder(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    name = db.Column(db.String(120), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
 
 
 class Author(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
 
 
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    name = db.Column(db.String(120), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
     date = db.Column(db.Date, nullable=True)
     visible = db.Column(db.Boolean, nullable=False, default=False)
 
