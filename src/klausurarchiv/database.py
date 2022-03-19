@@ -149,7 +149,7 @@ def add_author():
     try:
         loaded_schema = author_schema.load(request.json, partial=False)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     loaded_author = Author(**loaded_schema)
     db.session.add(loaded_author)
     db.session.commit()
@@ -168,7 +168,7 @@ def update_author(author_id):
     try:
         loaded_schema = author_schema.load(request.json, partial=True)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     a = Author.query.get_or_404(author_id)
     for key, value in loaded_schema.items():
         setattr(a, key, value)
@@ -202,7 +202,7 @@ def add_course():
     try:
         loaded_schema = course_schema.load(request.json, partial=False)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     loaded_course = Course(**loaded_schema)
     db.session.add(loaded_course)
     db.session.commit()
@@ -221,7 +221,7 @@ def update_course(course_id):
     try:
         loaded_schema = course_schema.load(request.json, partial=True)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     c = Course.query.get_or_404(course_id)
     for key, value in loaded_schema.items():
         setattr(c, key, value)
@@ -256,7 +256,7 @@ def add_folder():
     try:
         loaded_schema = folder_schema.load(request.json, partial=False)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     loaded_folder = Folder(**loaded_schema)
     db.session.add(loaded_folder)
     db.session.commit()
@@ -275,7 +275,7 @@ def update_folder(folder_id):
     try:
         loaded_schema = folder_schema.load(request.json, partial=True)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     f = Folder.query.get_or_404(folder_id)
     for key, value in loaded_schema.items():
         setattr(f, key, value)
@@ -314,7 +314,7 @@ def add_document():
     try:
         loaded_schema = document_schema.load(request.json, partial=False)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     loaded_document = Document(**loaded_schema)
 
     db.session.add(loaded_document)
@@ -340,7 +340,7 @@ def update_document(document_id):
     try:
         loaded_schema = document_schema.load(request.json, partial=True)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     d = Document.query.get_or_404(document_id)
     for key, value in loaded_schema.items():
         setattr(d, key, value)
@@ -432,7 +432,7 @@ def add_item():
         # https://github.com/marshmallow-code/flask-marshmallow/issues/44
         loaded_schema = item_schema.load(request.json, partial=False, transient=False, session=db.session)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     loaded_item = Item(**loaded_schema)
     db.session.add(loaded_item)
     db.session.commit()
@@ -456,7 +456,7 @@ def update_item(item_id):
         loaded_schema = item_schema.load(request.json, partial=True)
         # print(loaded_schema)
     except ValidationError as err:
-        return {"message": err.messages}, 400
+        return {"message": str(err.messages)}, 400
     i = Item.query.get_or_404(item_id)
     for key, value in loaded_schema.items():
         setattr(i, key, value)
