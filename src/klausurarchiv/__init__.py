@@ -1,10 +1,11 @@
 import json
 import os
-from pathlib import Path
 import secrets
+from pathlib import Path
+from typing import Optional, Union
 
 from flask import Flask
-from flask import Response, g
+from flask import Response
 from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
@@ -23,7 +24,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def create_app(test_config=None):
+def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = None):
     app = Flask(__name__)
 
     # should add the argument origins=["https://fsmi.uni-paderborn.de"] after deployment
@@ -41,12 +42,14 @@ def create_app(test_config=None):
     #
     # All of them are created with defaults or new values if they do not exist.
     if test_config is None:
-        app.instance_path = os.environ.get("KLAUSURARCHIV_INSTANCE")
-        if app.instance_path is None:
-            app.instance_path = Path("/etc/klausurarchiv/")
+        if instance_path is not None:
+            app.instance_path = instance_path
+        elif "KLAUSURARCHIV_INSTANCE" in os.environ:
+            app.instance_path = os.environ["KLAUSURARCHIV_INSTANCE"]
         else:
-            app.instance_path = Path(app.instance_path)
+            app.instance_path = Path("/etc/klausurarchiv/")
 
+        app.instance_path = Path(app.instance_path)
         app.instance_path.mkdir(parents=True, exist_ok=True)
 
         config_path = app.instance_path / Path("config.json")
@@ -62,9 +65,10 @@ def create_app(test_config=None):
             app.secret_key = open(secret_path, mode="r").read()
         else:
             app.secret_key = secrets.token_hex()
-            secret_path.touch(mode=0o700)
+            secret_path.touch(mode=0o600)
             with open(secret_path, mode="w") as secret_file:
                 secret_file.write(app.secret_key)
+            secret_path.chmod(0o400)
     else:
         app.config.from_mapping(test_config)
         app.secret_key = secrets.token_hex()

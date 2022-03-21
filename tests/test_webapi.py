@@ -1,10 +1,8 @@
-import tempfile
 from functools import wraps
-from typing import Callable, Dict
 from hashlib import sha256
+from typing import Callable, Dict
 
 import pytest
-from flask import session
 from flask.testing import FlaskClient
 from werkzeug.test import TestResponse
 
