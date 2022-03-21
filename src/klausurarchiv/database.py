@@ -6,10 +6,12 @@ Contains the logic for all API endpoints that access the underlying database.
 import cgi
 import hashlib
 import io
+import ipaddress
+from typing import Dict, Optional, List
 
 from flask import request, send_file, Blueprint, current_app
 from flask_login import login_required, current_user
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import RequestEntityTooLarge, Unauthorized
 
 from klausurarchiv.models import *
 
@@ -22,11 +24,45 @@ def make_list_response(schema, elements):
     :return: Mapped serialization
     """
     # map ids to objects
-    resp = {obj.id : schema.dump(obj) for obj in elements}
+    resp = {obj.id: schema.dump(obj) for obj in elements}
     return resp, 200
 
 
 bp = Blueprint('database', __name__, url_prefix="/v1")
+
+
+@bp.before_request
+def check_ip_address():
+    client_ip = ipaddress.ip_address(request.access_route[0])
+
+    def check_rules(rules: Optional[Dict[str, List[str]]]) -> bool:
+        if "allow" in rules and "deny" in rules:
+            raise Exception("Config error: No simultaneous allow and deny rules allowed")
+
+        if "allow" in rules:
+            return any(client_ip in ipaddress.ip_network(network) for network in rules["allow"])
+        elif "deny" in rules:
+            return all(client_ip not in ipaddress.ip_network(network) for network in rules["deny"])
+        else:
+            return True
+
+    access_config = current_app.config.get("ACCESS")
+
+    if access_config is None:
+        allowed = True
+    else:
+        resource_name = request.path.split("/")[2]
+
+        if resource_name in access_config:
+            allowed = check_rules(access_config[resource_name])
+        elif "*" in access_config:
+            allowed = check_rules(access_config["*"])
+        else:
+            allowed = True
+
+    if not allowed:
+        raise Unauthorized("IP address blocked")
+
 
 """
 Author related routes
@@ -226,7 +262,7 @@ def get_document(document_id):
     else:
         # unauthenticated users only see documents belonging to a visible item
         # we join Document to items via backref
-        document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=document_id)\
+        document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=document_id) \
             .first_or_404()
     return document_schema.dump(document)
 
