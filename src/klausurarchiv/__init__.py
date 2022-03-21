@@ -1,44 +1,77 @@
 import json
 import os
+import secrets
+from pathlib import Path
+from typing import Optional, Union
 
 from flask import Flask
-from flask import Response, g
+from flask import Response
 from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 
 from klausurarchiv import auth, database
 
+DEFAULT_CONFIG = {
+    "MAX_CONTENT_LENGTH": int(100e6),
+    "SESSION_COOKIE_NAME": "KLAUSURARCHIV",
+    "USERNAME": None,
+    "PASSWORD_SHA256": None,
+    "CACHE_TYPE": "SimpleCache",
+    "CACHE_DEFAULT_TIMEOUT": 300,
+    "SQLALCHEMY_TRACK_MODIFICATIONS": False,  # disables (unused) hooks that impact performance significantly
+    "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"
+}
 
-def create_app(test_config=None):
-    app = Flask(__name__, instance_path=os.environ.get("KLAUSURARCHIV_INSTANCE"), instance_relative_config=True)
+
+def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = None):
+    app = Flask(__name__)
 
     # should add the argument origins=["https://fsmi.uni-paderborn.de"] after deployment
     CORS(app, supports_credentials=True)
 
-    app.config.from_mapping(
-        ARCHIVE_PATH=app.instance_path,
-        MAX_CONTENT_LENGTH=int(100e6),
-        SESSION_COOKIE_NAME="KLAUSURARCHIV",
-        USERNAME=None,
-        PASSWORD_SHA256=None,
-        CACHE_TYPE="SimpleCache",
-        CACHE_DEFAULT_TIMEOUT=300,
-        SQLALCHEMY_TRACK_MODIFICATIONS =False # disables (unused) hooks that impact performance significantly
-        # SQLALCHEMY_DATABASE_URI="sqlite:////tmp/test.db"  # TODO: switch to Postgres for deployment
-    )
+    app.config.from_mapping(DEFAULT_CONFIG)
 
+    # If `test_config` is given, it will use it and generate a temporary secret. Otherwise, it will look for
+    # configuration files. If the environment variable `KLAUSURARCHIV_INSTANCE` is set, it will use it the configuration
+    # directory. Otherwise, it will use `/etc/klausurarchiv/`.
+    #
+    # The configuration files are:
+    # * `config.json`: General, non-secret configuration values.
+    # * `secret`: The secret signing secret.
+    #
+    # All of them are created with defaults or new values if they do not exist.
     if test_config is None:
-        app.config.from_pyfile("config.py", silent=True)
+        if instance_path is not None:
+            app.instance_path = instance_path
+        elif "KLAUSURARCHIV_INSTANCE" in os.environ:
+            app.instance_path = os.environ["KLAUSURARCHIV_INSTANCE"]
+        else:
+            app.instance_path = Path("/etc/klausurarchiv/")
+
+        app.instance_path = Path(app.instance_path)
+        app.instance_path.mkdir(parents=True, exist_ok=True)
+
+        config_path = app.instance_path / Path("config.json")
+        secret_path = app.instance_path / Path("secret")
+
+        if config_path.exists():
+            app.config.from_file(config_path, silent=True, load=json.load)
+        else:
+            with open(config_path, mode="w") as config_file:
+                json.dump(DEFAULT_CONFIG, config_file, indent="    ")
+
+        if secret_path.exists():
+            app.secret_key = open(secret_path, mode="r").read()
+        else:
+            app.secret_key = secrets.token_hex()
+            secret_path.touch(mode=0o600)
+            with open(secret_path, mode="w") as secret_file:
+                secret_file.write(app.secret_key)
+            secret_path.chmod(0o400)
     else:
         app.config.from_mapping(test_config)
-
-    try:
-        app.secret_key = database.Archive(app.config["ARCHIVE_PATH"]).secret_key
-    except FileNotFoundError:
-        # might wanna randomly generate a secret_key, but that would invalidate old session cookies i think
-        app.secret_key = "KLAUSURARCHIV_INSECURE_FALLBACK_SECRET"
-        app.logger.warn("Secret key was not found, using insecure fallback secret key!")
+        app.secret_key = secrets.token_hex()
 
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -62,10 +95,6 @@ def create_app(test_config=None):
                 status=500,
                 content_type="application/json"
             )
-
-    @app.before_request
-    def open_archive():
-        g.archive = database.Archive(app.config["ARCHIVE_PATH"])
 
     auth.init_app(app)
 
