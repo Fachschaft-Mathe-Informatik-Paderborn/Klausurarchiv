@@ -20,7 +20,12 @@ DEFAULT_CONFIG = {
     "CACHE_TYPE": "SimpleCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
     "SQLALCHEMY_TRACK_MODIFICATIONS": False,  # disables (unused) hooks that impact performance significantly
-    "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"
+    "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+    "ACCESS": {
+        "*": {
+            "allow": ["0.0.0.0/0", "::/0"]
+        }
+    }
 }
 
 
