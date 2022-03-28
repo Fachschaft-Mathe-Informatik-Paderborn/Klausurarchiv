@@ -27,81 +27,88 @@ USER = args.user[0]
 PASSWORD = args.password[0]
 OLD_ARCHIVE_FOLDER = args.archive[0]
 
-name_dict = dict()
-course_dict = dict()
-date_dict = dict()
-author_dict = dict()
-folder_dict = dict()
-
-for folder_path in (OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir():
-    if not folder_path.is_dir():
-        continue
-
-    folder_name = folder_path.name.split(" - ")
-    folder_name = folder_name[0] + " - " + folder_name[1]
-    for item_path in folder_path.glob("*.pdf"):
-        stem = item_path.stem
-
-        (courses, date, filename, _, authors) = stem.split(" - ")
-
-        name_dict[stem] = courses
-        course_dict[stem] = set(courses.split("; "))
-        date_dict[stem] = date
-        author_dict[stem] = set(authors.split("; "))
-        folder_dict[stem] = folder_name
-
 r = requests.post(f"{SERVER}/v1/login",
                   json={"username": USER, "password": PASSWORD})
 assert r.status_code == 200
 cookies = r.cookies
 
+courses = {value["long_name"]: key for key, value in requests.get(
+    f"{SERVER}/v1/courses", cookies=cookies).json().items()}
+authors = {value["name"]: key for key, value in requests.get(
+    f"{SERVER}/v1/authors", cookies=cookies).json().items()}
+folders = {value["name"]: key for key, value in requests.get(
+    f"{SERVER}/v1/authors", cookies=cookies).json().items()}
 
-def create_resources(resource_dict, resource_name, to_json, multi_entries=False):
-    if multi_entries:
-        resources = chain(*resource_dict.values())
-    else:
-        resources = resource_dict.values()
+for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir())):
+    if not folder_path.is_dir():
+        continue
 
-    resource_ids = dict()
+    folder_name = folder_path.name.split(" - ")
+    folder_name = folder_name[0] + " - " + folder_name[1]
 
-    for resource in tqdm(set(resources)):
-        r = requests.post(f"{SERVER}/v1/{resource_name}",
-                          json=to_json(resource), cookies=cookies)
+    if folder_name not in folders:
+        r = requests.post(f"{SERVER}/v1/folders",
+                          json={"name": folder_name}, cookies=cookies)
         assert r.status_code == 201
-        resource_ids[resource] = r.json()["id"]
+        folders[folder_name] = r.json()["id"]
+    folder_id = folders[folder_name]
 
-    return resource_ids
+    for item_path in folder_path.glob("*.pdf"):
+        stem = item_path.stem
 
+        (course_names, date, filename, _, author_names) = stem.split(" - ")
 
-print("Creating authors...")
-author_ids = create_resources(author_dict, "authors", lambda name: {
-                              "name": name}, multi_entries=True)
+        name = course_names
 
-print("Creating courses...")
-course_ids = create_resources(course_dict, "courses", lambda course: {
-                              "long_name": course, "short_name": ""}, multi_entries=True)
+        course_ids = list()
+        for course_name in set(course_names.split("; ")):
+            if course_name not in courses:
+                r = requests.post(f"{SERVER}/v1/courses",
+                                  json={"long_name": course_name, "short_name": ""}, cookies=cookies)
+                assert r.status_code == 201
+                courses[course_name] = r.json()["id"]
+            course_ids.append(courses[course_name])
 
-print("Creating folders...")
-folder_ids = create_resources(folder_dict, "folders", lambda name: {
-                              "name": name}, multi_entries=False)
+        author_ids = list()
+        for author_name in set(author_names.split("; ")):
+            if author_name not in authors:
+                r = requests.post(f"{SERVER}/v1/authors",
+                                  json={"name": author_name}, cookies=cookies)
+                assert r.status_code == 201
+                authors[author_name] = r.json()["id"]
+            author_ids.append(authors[author_name])
 
-print("Creating items")
-for item, name in tqdm(name_dict.items()):
-    r = requests.post(
-        f"{SERVER}/v1/items",
-        json={
-            "name": name,
-            "date": date_dict[item],
-            "documents": [],
-            "authors": [author_ids[author] for author in author_dict[item]],
-            "courses": [course_ids[course] for course in course_dict[item]],
-            "folders": [folder_ids[folder_dict[item]]],
-            "visible": True
-        },
-        cookies=cookies
-    )
-    if r.status_code != 201:
-        print(r.json())
-    assert r.status_code == 201
+        if item_path.exists():
+            r = requests.post(f"{SERVER}/v1/documents",
+                            json={"filename": "Klausur.pdf", "downloadable": False, "content_type": "application/pdf"}, cookies=cookies)
+            assert r.status_code == 201
+            document_id = r.json()["id"]
 
-assert requests.post(f"{SERVER}/v1/logout", cookies=cookies).status_code == 200
+            r = requests.post(
+                f"{SERVER}/v1/upload?id={document_id}",
+                data=open(item_path, mode="rb"),
+                headers={
+                    "Content-type": "application/pdf"
+                },
+                cookies=cookies
+            )
+            assert r.status_code == 200
+        else:
+            document_id = None
+
+        r = requests.post(
+            f"{SERVER}/v1/items",
+            json={
+                "name": name,
+                "date": date,
+                "documents": [document_id] if document_id is not None else [],
+                "authors": author_ids,
+                "courses": course_ids,
+                "folders": [folder_id],
+                "visible": True
+            },
+            cookies=cookies
+        )
+        if r.status_code != 201:
+            print(r.json())
+        assert r.status_code == 201
