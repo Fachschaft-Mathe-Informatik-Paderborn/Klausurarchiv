@@ -29,7 +29,7 @@ OLD_ARCHIVE_FOLDER = args.archive[0]
 
 r = requests.post(f"{SERVER}/v1/login",
                   json={"username": USER, "password": PASSWORD})
-assert r.status_code == 200
+assert r.status_code == 200, f"Status was {r.status_code}"
 cookies = r.cookies
 
 courses = {value["long_name"]: key for key, value in requests.get(
@@ -49,7 +49,7 @@ for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir(
     if folder_name not in folders:
         r = requests.post(f"{SERVER}/v1/folders",
                           json={"name": folder_name}, cookies=cookies)
-        assert r.status_code == 201
+        assert r.status_code == 201, f"Status was {r.status_code}"
         folders[folder_name] = r.json()["id"]
     folder_id = folders[folder_name]
 
@@ -65,7 +65,7 @@ for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir(
             if course_name not in courses:
                 r = requests.post(f"{SERVER}/v1/courses",
                                   json={"long_name": course_name, "short_name": ""}, cookies=cookies)
-                assert r.status_code == 201
+                assert r.status_code == 201, f"Status was {r.status_code}"
                 courses[course_name] = r.json()["id"]
             course_ids.append(courses[course_name])
 
@@ -74,14 +74,14 @@ for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir(
             if author_name not in authors:
                 r = requests.post(f"{SERVER}/v1/authors",
                                   json={"name": author_name}, cookies=cookies)
-                assert r.status_code == 201
+                assert r.status_code == 201, f"Status was {r.status_code}"
                 authors[author_name] = r.json()["id"]
             author_ids.append(authors[author_name])
 
         if item_path.exists():
             r = requests.post(f"{SERVER}/v1/documents",
                             json={"filename": "Klausur.pdf", "downloadable": False, "content_type": "application/pdf"}, cookies=cookies)
-            assert r.status_code == 201
+            assert r.status_code == 201, f"Status was {r.status_code}"
             document_id = r.json()["id"]
 
             r = requests.post(
@@ -92,7 +92,7 @@ for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir(
                 },
                 cookies=cookies
             )
-            assert r.status_code == 200
+            assert r.status_code == 200, f"Status was {r.status_code}"
         else:
             document_id = None
 
@@ -111,4 +111,4 @@ for folder_path in tqdm(list((OLD_ARCHIVE_FOLDER / Path("alle-ordner")).iterdir(
         )
         if r.status_code != 201:
             print(r.json())
-        assert r.status_code == 201
+        assert r.status_code == 201, f"Status was {r.status_code}"
