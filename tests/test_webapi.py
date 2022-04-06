@@ -194,22 +194,44 @@ def test_documents_work(client):
 
 
 @authenticated
-def test_upload_download(client):
-    response = client.post("/v1/documents", json={
-        "filename": "a.txt",
-        "content_type": "text/plain",
-        "downloadable": True
+def _create_doc(client, filename, content_type, downloadable):
+    res = client.post("/v1/documents", json={
+        "filename": filename,
+        "content_type": content_type,
+        "downloadable": downloadable
     })
-    doc_id = response.get_json()["id"]
+    return res.get_json()["id"]
+
+@authenticated
+def _upload_doc(client, id, content_type, data):
+    r = client.post(f"/v1/upload?id={id}", content_type=content_type, data=data)
+
+def test_authenticated_upload_download(client):
+    doc_id = _create_doc(client, "a.txt", "text/plain", True)
+
+    login(client)
 
     response = client.post(f"/v1/upload?id={doc_id}", content_type="text/plain", data=b"Hello World")
     assert response.status_code == 200
     assert response.get_json() == {}
 
+
     response = client.get(f"/v1/download?id={doc_id}")
     assert response.status_code == 200
     assert response.data == b"Hello World"
     assert response.content_type == "text/plain; charset=utf-8"
+
+    logout(client)
+
+def test_unauthenticated_upload_download(client):
+    doc_id = _create_doc(client, "b.txt", "text/plain", False)
+
+    response = client.post(f"/v1/upload?id={doc_id}", content_type="text/plain", data=b"Hello World")
+    assert response.status_code == 401
+
+    _upload_doc(client, doc_id, "text/plain", b"Catch me if you can")
+    response = client.get(f"/v1/download?id={doc_id}")
+    assert response.status_code == 404
 
 
 @authenticated

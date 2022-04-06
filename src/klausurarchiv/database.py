@@ -177,9 +177,12 @@ def upload_document():
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
-    # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
-    return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,
+    if document.downloadable or current_user.is_authenticated:
+        # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
+        return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,
                      download_name=document.filename)
+    else:
+        return {"message": "Not found"}, 404
 
 
 """
