@@ -340,7 +340,7 @@ def download_document():
     if document.downloadable or current_user.is_authenticated:
         # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
         return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,
-                     download_name=document.filename)
+                         download_name=document.filename)
     else:
         return {"message": "Not found"}, 404
 
