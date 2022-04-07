@@ -11,7 +11,7 @@ from typing import Dict, Optional, List
 
 from flask import request, send_file, Blueprint, current_app
 from flask_login import login_required, current_user
-from werkzeug.exceptions import RequestEntityTooLarge, Unauthorized
+from werkzeug.exceptions import RequestEntityTooLarge, Unauthorized, abort
 
 from klausurarchiv.models import *
 
@@ -342,7 +342,7 @@ def download_document():
         return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,
                          download_name=document.filename)
     else:
-        return {"message": "Not found"}, 404
+        abort(404)
 
 
 """
