@@ -11,6 +11,7 @@ from typing import Dict, Optional, List
 
 from flask import request, send_file, Blueprint, current_app
 from flask.views import MethodView
+from flask_caching import Cache
 from flask_login import login_required, current_user
 from werkzeug.exceptions import RequestEntityTooLarge, Unauthorized
 
@@ -27,6 +28,8 @@ ALLOWED_CONTENT_TYPES = [
 ]
 
 bp = Blueprint('database', __name__, url_prefix="/v1")
+
+cache = Cache()
 
 
 def dump_id_to_object_mapping(schema, resources):
@@ -88,6 +91,7 @@ class Resource(MethodView):
     model: db.Model
     schema: ma.Schema
 
+    @cache.cached()
     def get(self, resource_id):
         if resource_id is None:
             all_resources = self.model.query.all()
@@ -154,6 +158,7 @@ class DocumentResource(Resource):
     model = Document
     schema = document_schema
 
+    @cache.cached()
     def get(self, resource_id):
         # TODO: Rework this with RestrictedResource
         if resource_id is None:
@@ -223,6 +228,7 @@ class ItemResource(Resource):
     model = Item
     schema = item_schema
 
+    @cache.cached()
     def get(self, resource_id):
         # TODO: Rework this with RestrictedResource
         if resource_id is None:
