@@ -2,6 +2,7 @@ from datetime import datetime
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import inspect, SQLAlchemy
 from marshmallow import validates, ValidationError
+from sqlalchemy.orm import deferred
 from werkzeug.utils import secure_filename
 
 db = SQLAlchemy()
@@ -35,7 +36,7 @@ class Document(db.Model):
     downloadable = db.Column(db.Boolean, nullable=False, default=False)
     content_type = db.Column(db.String(200), nullable=False)
 
-    file = db.Column(db.LargeBinary, nullable=True)
+    file = deferred(db.Column(db.LargeBinary, nullable=True))
 
 
 class Course(db.Model):
