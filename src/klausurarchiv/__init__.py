@@ -25,8 +25,10 @@ DEFAULT_CONFIG = {
         "*": {
             "allow": ["0.0.0.0/0", "::/0"]
         }
-    }
+    },
 }
+
+CACHE_CONFIG = {}
 
 
 def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = None):
@@ -117,9 +119,6 @@ def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = Non
     app.register_blueprint(bp)
 
     from klausurarchiv.database import cache
-    cache.init_app(app, config = {
-        'CACHE_TYPE' : 'SimpleCache',
-        'CACHE_DEFAULT_TIMEOUT' : 300
-    })
+    cache.init_app(app)
 
     return app

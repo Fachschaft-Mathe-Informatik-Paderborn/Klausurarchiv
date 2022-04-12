@@ -13,7 +13,7 @@ from klausurarchiv import create_app
 def client() -> FlaskClient:
     password_hash = sha256(bytes("4711", encoding="utf-8")).hexdigest()
     app = create_app(
-        {"TESTING": True, "USERNAME": "john", "PASSWORD_SHA256": password_hash})
+        {"TESTING": True, "USERNAME": "john", "PASSWORD_SHA256": password_hash, "CACHE_TYPE": "NullCache"})
 
     with app.test_client() as client:
         yield client
