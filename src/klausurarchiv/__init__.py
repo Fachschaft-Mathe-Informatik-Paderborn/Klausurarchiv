@@ -28,8 +28,6 @@ DEFAULT_CONFIG = {
     },
 }
 
-CACHE_CONFIG = {}
-
 
 def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = None):
     app = Flask(__name__)

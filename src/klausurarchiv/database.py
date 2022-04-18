@@ -7,6 +7,7 @@ import cgi
 import hashlib
 import io
 import ipaddress
+from abc import ABC
 from typing import Dict, Optional, List
 
 from flask import request, send_file, Blueprint, current_app
@@ -30,18 +31,6 @@ ALLOWED_CONTENT_TYPES = [
 bp = Blueprint('database', __name__, url_prefix="/v1")
 
 cache = Cache()
-
-
-def dump_id_to_object_mapping(schema, resources):
-    """
-    A list of model objects are serialized as a mapping from their id to the actual item
-    :param schema: serialization schema of type T
-    :param resources: list of elements of type T
-    :return: Mapped serialization
-    """
-    # map ids to objects
-    resp = {obj.id: schema.dump(obj) for obj in resources}
-    return resp, 200
 
 
 @bp.before_request
@@ -86,7 +75,7 @@ def register_api(view, endpoint, url, pk='id', pk_type='int'):
                     methods=['GET', 'PATCH', 'DELETE'], strict_slashes=False)
 
 
-# TODO: Make this abstract - inheriting ABC does not work because of metamagic
+# TODO: would like to make this abstract, but I'll have to read up on metaclasses for that
 class Resource(MethodView):
     model: db.Model
     schema: ma.Schema
@@ -95,8 +84,7 @@ class Resource(MethodView):
     def get(self, resource_id):
         if resource_id is None:
             all_resources = self.model.query.all()
-            # flask does not jsonify lists for security reasons, so explicit mimetype
-            return dump_id_to_object_mapping(self.schema, all_resources)
+            return self.dump_id_to_object_mapping(all_resources)
         else:
             resource = self.model.query.get_or_404(resource_id)
             return self.schema.dump(resource)
@@ -133,30 +121,34 @@ class Resource(MethodView):
         db.session.commit()
         return dict(), 200
 
-
-class RestrictedResource(Resource):
-    # TODO: subclass for resources where authorized/unauthorized behavior differ
-    pass
+    def dump_id_to_object_mapping(self, resources):
+        """
+        Serializes a list of resources as a mapping of their id to their actual content
+        :param resources: list of model objects
+        :return: Mapped serialization
+        """
+        resp = {r.id: self.schema.dump(r) for r in resources}
+        return resp, 200
 
 
 class AuthorResource(Resource):
     model = Author
-    schema = author_schema
+    schema = AuthorSchema()
 
 
 class CourseResource(Resource):
     model = Course
-    schema = course_schema
+    schema = CourseSchema()
 
 
 class FolderResource(Resource):
     model = Folder
-    schema = folder_schema
+    schema = FolderSchema()
 
 
 class DocumentResource(Resource):
     model = Document
-    schema = document_schema
+    schema = DocumentSchema()
 
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
@@ -205,7 +197,7 @@ def download_document():
 
 class ItemResource(Resource):
     model = Item
-    schema = item_schema
+    schema = ItemSchema()
 
 
 register_api(AuthorResource, 'author_api', '/authors/', pk='resource_id')
