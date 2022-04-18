@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
         "*": {
             "allow": ["0.0.0.0/0", "::/0"]
         }
-    }
+    },
 }
 
 
@@ -113,6 +113,10 @@ def create_app(test_config=None, instance_path: Optional[Union[Path, str]] = Non
     from klausurarchiv.models import ma
     ma.init_app(app)
 
-    app.register_blueprint(database.bp)
+    from klausurarchiv.database import bp
+    app.register_blueprint(bp)
+
+    from klausurarchiv.database import cache
+    cache.init_app(app)
 
     return app

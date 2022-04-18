@@ -83,11 +83,12 @@ class DocumentSchema(ma.SQLAlchemyAutoSchema):
         if secure_filename(filename) != filename or len(secure_filename(filename)) == 0:
             raise ValidationError("Insecure filename")
 
+
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Course
         # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
-        exclude = ("id", ) # ids are exposed via mapping
+        exclude = ("id",)  # ids are exposed via mapping
         ordered = True
 
 
@@ -95,7 +96,7 @@ class FolderSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Folder
         # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
-        exclude = ("id", ) # ids are exposed via mapping
+        exclude = ("id",)  # ids are exposed via mapping
         ordered = True
 
 
@@ -103,7 +104,7 @@ class AuthorSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Author
         # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
-        exclude = ("id", ) # ids are exposed via mapping
+        exclude = ("id",)  # ids are exposed via mapping
         ordered = True
 
 
@@ -111,7 +112,7 @@ class ItemSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Item
         # dump_only = ("id",)  # ids are given by database and cannot be controlled by user
-        exclude = ("id", ) # ids are exposed via mapping
+        exclude = ("id",)  # ids are exposed via mapping
         include_relationships = True  # Item links between resources, so we want to include their primary keys each time
         ordered = True
         dateformat = "%Y-%m-%d"  # export time format consistently
@@ -140,15 +141,3 @@ class ItemSchema(ma.SQLAlchemyAutoSchema):
         for course in given_courses:
             if inspect(course).transient:
                 raise ValidationError(f"Course with id {course.id} does not exist.")
-
-
-# multiple schemas required to differentiate collections of an object versus single objects
-document_schema = DocumentSchema()
-
-course_schema = CourseSchema()
-
-folder_schema = FolderSchema()
-
-author_schema = AuthorSchema()
-
-item_schema = ItemSchema()
