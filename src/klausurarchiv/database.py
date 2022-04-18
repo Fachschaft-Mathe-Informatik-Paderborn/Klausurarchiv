@@ -158,27 +158,6 @@ class DocumentResource(Resource):
     model = Document
     schema = document_schema
 
-    @cache.cached()
-    def get(self, resource_id):
-        # TODO: Rework this with RestrictedResource
-        if resource_id is None:
-            if current_user.is_authenticated:
-                visible_documents = Document.query.all()
-            else:
-                # unauthenticated users only see documents belonging to a visible item
-                # we join Document to items via backref
-                visible_documents = Document.query.join(Document.items, aliased=True).filter_by(visible=True).all()
-            return dump_id_to_object_mapping(document_schema, visible_documents)
-        else:
-            if current_user.is_authenticated:
-                document = Document.query.get_or_404(resource_id)
-            else:
-                # unauthenticated users only see documents belonging to a visible item
-                # we join Document to items via backref
-                document = Document.query.join(Document.items, aliased=True).filter_by(visible=True, id=resource_id) \
-                    .first_or_404()
-            return document_schema.dump(document)
-
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
 @login_required
@@ -227,22 +206,6 @@ def download_document():
 class ItemResource(Resource):
     model = Item
     schema = item_schema
-
-    @cache.cached()
-    def get(self, resource_id):
-        # TODO: Rework this with RestrictedResource
-        if resource_id is None:
-            if current_user.is_authenticated:
-                visible_items = Item.query.all()
-            else:
-                visible_items = Item.query.filter_by(visible=True).all()
-            return dump_id_to_object_mapping(item_schema, visible_items)
-        else:
-            if current_user.is_authenticated:
-                item = Item.query.get_or_404(resource_id)
-            else:
-                item = Item.query.filter_by(visible=True, id=resource_id).first_or_404()
-        return item_schema.dump(item)
 
 
 register_api(AuthorResource, 'author_api', '/authors/', pk='resource_id')
