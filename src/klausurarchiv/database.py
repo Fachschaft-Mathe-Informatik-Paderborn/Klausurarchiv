@@ -69,7 +69,7 @@ class Resource(MethodView):
     model: db.Model
     schema: ma.Schema
 
-    @cache.cached()
+    @cache.memoize()
     def get(self, resource_id):
         if resource_id is None:
             all_resources = self.model.query.all()
@@ -94,6 +94,7 @@ class Resource(MethodView):
         if error_message is None:
             db.session.add(loaded_resource)
             db.session.commit()
+            cache.clear()
             return {"id": loaded_resource.id}, 201
         else:
             return {"message": error_message}, 400
@@ -111,6 +112,7 @@ class Resource(MethodView):
         error_message = self.is_resource_valid(r)
         if error_message is None:
             db.session.commit()
+            cache.clear()
             return dict(), 200
         else:
             return {"message": error_message}, 400
@@ -128,6 +130,7 @@ class Resource(MethodView):
         resource = self.model.query.get_or_404(resource_id)
         db.session.delete(resource)
         db.session.commit()
+        cache.clear()
         return dict(), 200
 
     def dump_id_to_object_mapping(self, resources):
@@ -185,10 +188,12 @@ def upload_document():
     document.file = request.get_data()
 
     db.session.commit()
+    cache.clear()
     return dict(), 200
 
 
 @bp.route("/download", methods=["GET"], strict_slashes=False)
+@cache.memoize()
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
