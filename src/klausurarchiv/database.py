@@ -3,12 +3,9 @@ database.py
 ========================
 Contains the logic for all API endpoints that access the underlying database.
 """
-import cgi
-import hashlib
 import io
 import ipaddress
-from abc import ABC
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Union
 
 from flask import request, send_file, Blueprint, current_app
 from flask.views import MethodView
@@ -17,16 +14,6 @@ from flask_login import login_required, current_user
 from werkzeug.exceptions import RequestEntityTooLarge, Unauthorized, abort
 
 from klausurarchiv.models import *
-
-ALLOWED_CONTENT_TYPES = [
-    "application/msword",
-    "application/pdf",
-    "application/x-latex",
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "text/plain",
-]
 
 bp = Blueprint('database', __name__, url_prefix="/v1")
 
@@ -39,7 +26,8 @@ def check_ip_address():
 
     def check_rules(rules: Optional[Dict[str, List[str]]]) -> bool:
         if "allow" in rules and "deny" in rules:
-            raise Exception("Config error: No simultaneous allow and deny rules allowed")
+            raise Exception(
+                "Config error: No simultaneous allow and deny rules allowed")
 
         if "allow" in rules:
             return any(client_ip in ipaddress.ip_network(network) for network in rules["allow"])
@@ -70,7 +58,8 @@ def register_api(view, endpoint, url, pk='id', pk_type='int'):
     view_func = view.as_view(endpoint)
     bp.add_url_rule(url, defaults={pk: None},
                     view_func=view_func, methods=['GET', ], strict_slashes=False)
-    bp.add_url_rule(url, view_func=view_func, methods=['POST', ], strict_slashes=False)
+    bp.add_url_rule(url, view_func=view_func, methods=[
+                    'POST', ], strict_slashes=False)
     bp.add_url_rule(f'{url}<{pk_type}:{pk}>', view_func=view_func,
                     methods=['GET', 'PATCH', 'DELETE'], strict_slashes=False)
 
@@ -94,13 +83,20 @@ class Resource(MethodView):
         try:
             # include db.session explicitly as workaround for weird corner case
             # https://github.com/marshmallow-code/flask-marshmallow/issues/44
-            loaded_schema = self.schema.load(request.json, partial=False, session=db.session)
+            loaded_schema = self.schema.load(
+                request.json, partial=False, session=db.session)
         except ValidationError as err:
             return {"message": str(err.messages)}, 400
         loaded_resource = self.model(**loaded_schema)
-        db.session.add(loaded_resource)
-        db.session.commit()
-        return {"id": loaded_resource.id}, 201
+
+        error_message = self.is_resource_valid(loaded_resource)
+
+        if error_message is None:
+            db.session.add(loaded_resource)
+            db.session.commit()
+            return {"id": loaded_resource.id}, 201
+        else:
+            return {"message": error_message}, 400
 
     @login_required
     def patch(self, resource_id):
@@ -111,8 +107,21 @@ class Resource(MethodView):
         r = self.model.query.get_or_404(resource_id)
         for key, value in loaded_schema.items():
             setattr(r, key, value)
-        db.session.commit()
-        return dict(), 200
+
+        error_message = self.is_resource_valid(r)
+        if error_message is None:
+            db.session.commit()
+            return dict(), 200
+        else:
+            return {"message": error_message}, 400
+
+    def is_resource_valid(self, resource) -> Union[None, str]:
+        """
+        Test the resource's semantic structure.
+
+        If the resource is valid, return None. Otherwise, return a string that describes the offense.
+        """
+        return None
 
     @login_required
     def delete(self, resource_id):
@@ -150,6 +159,16 @@ class DocumentResource(Resource):
     model = Document
     schema = DocumentSchema()
 
+    def is_resource_valid(self, resource) -> Union[None, str]:
+        if resource.content_type not in current_app.config["ALLOWED_CONTENT_TYPES"]:
+            return f"Content type '{resource.content_type}' is not allowed by the server."
+
+        if len(resource.filename) == 0:
+            return "Empty filename"
+
+        if not secure_filename(resource.filename):
+            return "Insecure filename"
+
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
 @login_required
@@ -160,25 +179,11 @@ def upload_document():
     if request.content_length > current_app.config["MAX_CONTENT_LENGTH"]:
         raise RequestEntityTooLarge()
 
+    if document.content_type != request.headers.get("Content-Type"):
+        return {"message": "The uploaded content's type does not match the database entry"}, 400
+
     document.file = request.get_data()
 
-    document.content_type = request.headers.get("Content-Type")
-    if document.content_type not in ALLOWED_CONTENT_TYPES:
-        return {"message": f"Content Type {document.content_type} not allowed"}, 400
-
-    # parse Content-Disposition header for secure access to attributes without janky regex or similar
-    _, params = cgi.parse_header(request.headers.get('Content-Disposition', ""))
-
-    # if given override the old filename by the one given through the header, otherwise default to existing one
-    new_filename = params.get("filename", document.filename)
-
-    if not new_filename or secure_filename(new_filename) != new_filename:
-        # if somehow neither header nor database contain a filename (or they are corrutped) we fallback to random
-        new_filename = hashlib.sha256(bytes(document.file)).hexdigest()
-
-    document.filename = new_filename
-
-    db.session.add(document)
     db.session.commit()
     return dict(), 200
 
