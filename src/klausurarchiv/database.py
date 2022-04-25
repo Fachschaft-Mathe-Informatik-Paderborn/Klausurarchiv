@@ -89,15 +89,10 @@ class Resource(MethodView):
             return {"message": str(err.messages)}, 400
         loaded_resource = self.model(**loaded_schema)
 
-        error_message = self.is_resource_valid(loaded_resource)
-
-        if error_message is None:
-            db.session.add(loaded_resource)
-            db.session.commit()
-            cache.clear()
-            return {"id": loaded_resource.id}, 201
-        else:
-            return {"message": error_message}, 400
+        db.session.add(loaded_resource)
+        db.session.commit()
+        cache.clear()
+        return {"id": loaded_resource.id}, 201
 
     @login_required
     def patch(self, resource_id):
@@ -109,21 +104,9 @@ class Resource(MethodView):
         for key, value in loaded_schema.items():
             setattr(r, key, value)
 
-        error_message = self.is_resource_valid(r)
-        if error_message is None:
-            db.session.commit()
-            cache.clear()
-            return dict(), 200
-        else:
-            return {"message": error_message}, 400
-
-    def is_resource_valid(self, resource) -> Union[None, str]:
-        """
-        Test the resource's semantic structure.
-
-        If the resource is valid, return None. Otherwise, return a string that describes the offense.
-        """
-        return None
+        db.session.commit()
+        cache.clear()
+        return dict(), 200
 
     @login_required
     def delete(self, resource_id):
@@ -162,16 +145,6 @@ class DocumentResource(Resource):
     model = Document
     schema = DocumentSchema()
 
-    def is_resource_valid(self, resource) -> Union[None, str]:
-        if resource.content_type not in current_app.config["ALLOWED_CONTENT_TYPES"]:
-            return f"Content type '{resource.content_type}' is not allowed by the server."
-
-        if len(resource.filename) == 0:
-            return "Empty filename"
-
-        if not secure_filename(resource.filename):
-            return "Insecure filename"
-
 
 @bp.route("/upload", methods=["POST"], strict_slashes=False)
 @login_required
@@ -197,6 +170,7 @@ def upload_document():
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
+    
     if document.downloadable or current_user.is_authenticated:
         # since document is stored in database, we cannot supply an actual file handle, just the corresponding bytes
         return send_file(io.BytesIO(document.file), mimetype=document.content_type, as_attachment=True,

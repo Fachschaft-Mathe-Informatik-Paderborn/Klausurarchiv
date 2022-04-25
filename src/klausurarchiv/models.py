@@ -1,4 +1,5 @@
 from datetime import datetime
+from flask import current_app
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import inspect, SQLAlchemy
 from marshmallow import validates, ValidationError
@@ -82,6 +83,11 @@ class DocumentSchema(ma.SQLAlchemyAutoSchema):
     def filename_is_secure(self, filename):
         if secure_filename(filename) != filename or len(secure_filename(filename)) == 0:
             raise ValidationError("Insecure filename")
+
+    @validates("content_type")
+    def content_type_is_legal(self, content_type):
+        if content_type not in current_app.config["ALLOWED_CONTENT_TYPES"]:
+            raise ValidationError("Content type is not allowed by the server")
 
 
 class CourseSchema(ma.SQLAlchemyAutoSchema):
