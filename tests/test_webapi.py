@@ -108,7 +108,8 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.get_json() == {}
 
     # Creating a new folder
-    response: TestResponse = client.post(f"/v1/{resource_name}", json=initial_data)
+    response: TestResponse = client.post(
+        f"/v1/{resource_name}", json=initial_data)
     assert response.status_code == 201
     rs_id = response.get_json()["id"]
     assert isinstance(rs_id, int)
@@ -124,7 +125,8 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.get_json() == initial_data
 
     # Partial Patching
-    response: TestResponse = client.patch(f"/v1/{resource_name}/{rs_id}", json=partial_patch)
+    response: TestResponse = client.patch(
+        f"/v1/{resource_name}/{rs_id}", json=partial_patch)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -142,7 +144,8 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.get_json() == patched_data
 
     # Full Patching
-    response: TestResponse = client.patch(f"/v1/{resource_name}/{rs_id}", json=full_patch)
+    response: TestResponse = client.patch(
+        f"/v1/{resource_name}/{rs_id}", json=full_patch)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -166,7 +169,8 @@ def template_test_resource(client: FlaskClient, resource_name: str, initial_data
     assert response.get_json() == {}
 
     # Checking that trailing slashes work too
-    response: TestResponse = client.post(f"/v1/{resource_name}/", json=initial_data)
+    response: TestResponse = client.post(
+        f"/v1/{resource_name}/", json=initial_data)
     assert response.status_code == 201
     rs_id = response.get_json()["id"]
 
@@ -190,7 +194,49 @@ def test_documents_work(client):
         "downloadable": True,
         "content_type": "application/x-latex"
     }
-    template_test_resource(client, "documents", full_data, partial_patch, full_patch)
+    template_test_resource(client, "documents", full_data,
+                           partial_patch, full_patch)
+
+
+@authenticated
+def test_document_content_type_check(client):
+    # Create a valid document to work with
+    r = client.post("/v1/documents", json={
+        'filename': "test.txt",
+        'downloadable': True,
+        'content_type': "text/plain"
+    })
+    assert r.status_code == 201
+    doc_id = int(r.json["id"])
+
+    # Try to change the content type to ZIP (not allowed), test response
+    r = client.patch(f"/v1/documents/{doc_id}", json={
+        'filename': "test.zip",
+        'downloadable': True,
+        'content_type': "application/zip"
+    })
+    assert r.status_code == 400
+
+    # Assure that illegal content type was not commited
+    r = client.get(f"/v1/documents/{doc_id}")
+    assert r.status_code == 200
+    assert r.json == {
+        'filename': "test.txt",
+        'downloadable': True,
+        'content_type': "text/plain"
+    }
+
+    # Lastly, try to create a new document with an illegal content type
+    r = client.post("/v1/documents", json={
+        'filename': "test.zip",
+        'downloadable': True,
+        'content_type': "application/zip"
+    })
+    assert r.status_code == 400
+
+    # Assure that the document wasn't accidentally commited
+    r = client.get(f"/v1/documents/{doc_id+1}")
+    assert r.status_code == 404
 
 
 @authenticated
@@ -205,7 +251,8 @@ def _create_doc(client, filename, content_type, downloadable):
 
 @authenticated
 def _upload_doc(client, doc_id, content_type, data):
-    response = client.post(f"/v1/upload?id={doc_id}", content_type=content_type, data=data)
+    response = client.post(
+        f"/v1/upload?id={doc_id}", content_type=content_type, data=data)
     assert response.status_code == 200
     assert response.get_json() == {}
 
@@ -225,7 +272,8 @@ def test_authenticated_upload_download(client):
 def test_unauthenticated_upload_download(client):
     doc_id = _create_doc(client, "b.txt", "text/plain", False)
 
-    response = client.post(f"/v1/upload?id={doc_id}", content_type="text/plain", data=b"Hello World")
+    response = client.post(
+        f"/v1/upload?id={doc_id}", content_type="text/plain", data=b"Hello World")
     assert response.status_code == 401
 
     _upload_doc(client, doc_id, "text/plain", b"Hello World")
@@ -247,7 +295,8 @@ def test_courses_work(client):
         "long_name": "Foundations of Rocket Science",
         "short_name": "FRS"
     }
-    template_test_resource(client, "courses", full_data, partial_path, full_patch)
+    template_test_resource(client, "courses", full_data,
+                           partial_path, full_patch)
 
 
 @authenticated
@@ -259,7 +308,8 @@ def test_folders_work(client):
     full_patch = {
         "name": "Foundations of Rocket Science"
     }
-    template_test_resource(client, "folders", full_data, partial_patch, full_patch)
+    template_test_resource(client, "folders", full_data,
+                           partial_patch, full_patch)
 
 
 @authenticated
@@ -271,7 +321,8 @@ def test_authors_work(client):
     full_patch = {
         "name": "John Mustermann-Doe"
     }
-    template_test_resource(client, "authors", full_data, partial_patch, full_patch)
+    template_test_resource(client, "authors", full_data,
+                           partial_patch, full_patch)
 
 
 @authenticated
@@ -333,7 +384,8 @@ def test_items_work(client):
         "visible": True
     }
 
-    template_test_resource(client, "items", full_data, partial_patch, full_patch)
+    template_test_resource(client, "items", full_data,
+                           partial_patch, full_patch)
 
 
 @pytest.mark.skip(reason="This is what we would trade in exchange for cleaner code.")

@@ -26,6 +26,15 @@ DEFAULT_CONFIG = {
             "allow": ["0.0.0.0/0", "::/0"]
         }
     },
+    "ALLOWED_CONTENT_TYPES": [
+        "application/msword",
+        "application/pdf",
+        "application/x-latex",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "text/plain",
+    ]
 }
 
 
