@@ -166,7 +166,6 @@ def upload_document():
 
 
 @bp.route("/download", methods=["GET"], strict_slashes=False)
-@cache.memoize()
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
