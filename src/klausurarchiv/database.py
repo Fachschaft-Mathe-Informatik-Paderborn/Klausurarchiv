@@ -69,7 +69,10 @@ class Resource(MethodView):
     model: db.Model
     schema: ma.Schema
 
-    @cache.memoize()
+    # cache.memoize does not work well since it does not cache "None" by default (and actually discourages doing so)
+    # cached is actually correct here: Caching is based on request.path, which is different because of MethodView
+    # since there are multiple associated routes, that
+    @cache.cached()
     def get(self, resource_id):
         if resource_id is None:
             all_resources = self.model.query.all()
@@ -166,6 +169,7 @@ def upload_document():
 
 
 @bp.route("/download", methods=["GET"], strict_slashes=False)
+@cache.cached(query_string=True) # parameter needed to actually return the right files
 def download_document():
     document_id = request.args.get("id", default=None)
     document = Document.query.get_or_404(document_id)
