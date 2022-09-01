@@ -95,11 +95,11 @@ The database queries all follow the same scheme: There is a request to get all r
 
 | Class | Location |
 |-|-|
-| Item | `/v1/items` |
-| Document | `/v1/documents` |
-| Course | `/v1/courses` |
-| Folder | `/v1/folders` |
-| Author | `/v1/authors` |
+| Item | `/v1/items/` |
+| Document | `/v1/documents/` |
+| Course | `/v1/courses/` |
+| Folder | `/v1/folders/` |
+| Author | `/v1/authors/` |
 
 Access to certain resources may be restricted depending on the resource class and the client's authorization:
 
@@ -109,7 +109,7 @@ Access to certain resources may be restricted depending on the resource class an
 
 The creation, modification and deletion of resources is only possible by users that are logged in and are authorized to do so.
 
-## `GET /v1/<resource>s`
+## `GET /v1/<resource>s/`
 
 Get all resources from the archive.
 
@@ -175,7 +175,7 @@ The query was successful. The body is an empty object.
 
 # Document content up- and downloads
 
-While documents are represented as the `/v1/documents` resource, it only provides metadata information. The actual contents are up- and downloaded at separate endpoints. Downloading documents is possible iff the user is logged in and is authorized to download all documents, or the document belongs to a downloadable document of a visible item. Uploading documents is only possible by authorized users.
+While documents are represented as the `/v1/documents/` resource, it only provides metadata information. The actual contents are up- and downloaded at separate endpoints. Downloading documents is possible iff the user is logged in and is authorized to download all documents, or the document belongs to a downloadable document of a visible item. Uploading documents is only possible by authorized users.
 
 ## `POST /v1/upload`
 
