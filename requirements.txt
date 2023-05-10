@@ -1,8 +1,8 @@
 pytest
-flask~=2.0.1
+flask
 flask_cors
-werkzeug~=2.0.1
-click~=8.0.1
+werkzeug
+click
 flask_login
 coverage
 tqdm

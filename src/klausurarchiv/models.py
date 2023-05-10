@@ -1,7 +1,8 @@
 from datetime import datetime
 from flask import current_app
 from flask_marshmallow import Marshmallow
-from flask_sqlalchemy import inspect, SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect
 from marshmallow import validates, ValidationError
 from sqlalchemy.orm import deferred
 from werkzeug.utils import secure_filename
