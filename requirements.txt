@@ -11,4 +11,4 @@ flask_SQLAlchemy~=3.0.3
 flask_marshmallow~=0.15.0
 marshmallow-sqlalchemy~=0.29.0
 gunicorn~=20.1.0
-psycopg2~=2.9.6
+psycopg2~=2.9.5
